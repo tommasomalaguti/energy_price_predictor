@@ -1,0 +1,66 @@
+# Configuration file for electricity price forecasting project
+
+# Data settings
+data:
+  country: "IT"  # Country code for ENTSO-E data
+  start_date: "2022-01-01"
+  end_date: "2024-01-01"
+  data_type: "day_ahead"  # day_ahead or intraday
+
+# Preprocessing settings
+preprocessing:
+  outlier_threshold: 3.0
+  missing_threshold: 0.1
+  price_min: -100
+  price_max: 1000
+  interpolation_method: "linear"
+
+# Feature engineering
+features:
+  lag_features: [1, 2, 3, 6, 12, 24, 48, 168]  # Hours
+  rolling_windows: [3, 6, 12, 24, 48, 168]  # Hours
+  weather_features: true
+  holiday_features: true
+
+# Model settings
+models:
+  baseline:
+    enabled: true
+  ml:
+    enabled: true
+    tune_hyperparameters: false
+    cv_folds: 5
+  time_series:
+    enabled: true
+    arima:
+      auto_order: true
+      max_p: 5
+      max_d: 2
+      max_q: 5
+    sarimax:
+      auto_order: true
+      seasonal_periods: 24
+    prophet:
+      enabled: true
+    lstm:
+      enabled: false  # Requires TensorFlow
+      sequence_length: 24
+      units: 50
+      epochs: 100
+
+# Evaluation settings
+evaluation:
+  test_size: 0.2
+  metrics: ["rmse", "mae", "mape", "directional_accuracy", "r2"]
+  confidence_level: 0.95
+
+# Visualization settings
+visualization:
+  figsize: [12, 8]
+  max_plot_points: 1000
+  style: "seaborn-v0_8"
+
+# API settings
+api:
+  entsoe_token: null  # Set via environment variable ENTSOE_API_TOKEN
+  openweather_token: null  # Set via environment variable OPENWEATHER_API_KEY
