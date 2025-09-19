@@ -247,7 +247,7 @@ class DataPreprocessor:
         if price_df is None:
             price_df = self.price_data.copy()
         if weather_df is None:
-            weather_df = self.weather_data.copy()
+            weather_df = self.weather_data.copy() if self.weather_data is not None else None
         
         if price_df is None:
             raise ValueError("No price data available for feature engineering")

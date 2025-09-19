@@ -17,8 +17,19 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.base import BaseEstimator, RegressorMixin
-import xgboost as xgb
-import lightgbm as lgb
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    print("Warning: XGBoost not available. XGBoost models will be disabled.")
+
+try:
+    import lightgbm as lgb
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
+    print("Warning: LightGBM not available. LightGBM models will be disabled.")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,7 +60,7 @@ class MLModels:
     
     def _initialize_models(self) -> Dict[str, BaseEstimator]:
         """Initialize all ML models with default parameters."""
-        return {
+        models = {
             'linear_regression': LinearRegression(),
             'ridge': Ridge(alpha=1.0, random_state=self.random_state),
             'lasso': Lasso(alpha=0.1, random_state=self.random_state),
@@ -68,21 +79,6 @@ class MLModels:
                 max_depth=6,
                 random_state=self.random_state
             ),
-            'xgboost': xgb.XGBRegressor(
-                n_estimators=100,
-                learning_rate=0.1,
-                max_depth=6,
-                random_state=self.random_state,
-                n_jobs=-1
-            ),
-            'lightgbm': lgb.LGBMRegressor(
-                n_estimators=100,
-                learning_rate=0.1,
-                max_depth=6,
-                random_state=self.random_state,
-                n_jobs=-1,
-                verbose=-1
-            ),
             'svr': SVR(kernel='rbf', C=1.0, gamma='scale'),
             'mlp': MLPRegressor(
                 hidden_layer_sizes=(100, 50),
@@ -94,10 +90,33 @@ class MLModels:
                 max_iter=500
             )
         }
+        
+        # Add XGBoost if available
+        if XGBOOST_AVAILABLE:
+            models['xgboost'] = xgb.XGBRegressor(
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=6,
+                random_state=self.random_state,
+                n_jobs=-1
+            )
+        
+        # Add LightGBM if available
+        if LIGHTGBM_AVAILABLE:
+            models['lightgbm'] = lgb.LGBMRegressor(
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=6,
+                random_state=self.random_state,
+                n_jobs=-1,
+                verbose=-1
+            )
+        
+        return models
     
     def _get_hyperparameter_grids(self) -> Dict[str, Dict[str, List]]:
         """Get hyperparameter grids for grid search."""
-        return {
+        grids = {
             'ridge': {
                 'alpha': [0.01, 0.1, 1.0, 10.0, 100.0]
             },
@@ -119,18 +138,6 @@ class MLModels:
                 'learning_rate': [0.01, 0.1, 0.2],
                 'max_depth': [3, 6, 10]
             },
-            'xgboost': {
-                'n_estimators': [50, 100, 200],
-                'learning_rate': [0.01, 0.1, 0.2],
-                'max_depth': [3, 6, 10],
-                'subsample': [0.8, 0.9, 1.0]
-            },
-            'lightgbm': {
-                'n_estimators': [50, 100, 200],
-                'learning_rate': [0.01, 0.1, 0.2],
-                'max_depth': [3, 6, 10],
-                'subsample': [0.8, 0.9, 1.0]
-            },
             'svr': {
                 'C': [0.1, 1.0, 10.0, 100.0],
                 'gamma': ['scale', 'auto', 0.001, 0.01, 0.1]
@@ -141,11 +148,31 @@ class MLModels:
                 'learning_rate': ['constant', 'adaptive']
             }
         }
+        
+        # Add XGBoost grid if available
+        if XGBOOST_AVAILABLE:
+            grids['xgboost'] = {
+                'n_estimators': [50, 100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 6, 10],
+                'subsample': [0.8, 0.9, 1.0]
+            }
+        
+        # Add LightGBM grid if available
+        if LIGHTGBM_AVAILABLE:
+            grids['lightgbm'] = {
+                'n_estimators': [50, 100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 6, 10],
+                'subsample': [0.8, 0.9, 1.0]
+            }
+        
+        return grids
     
     def preprocess_features(self, X_train: pd.DataFrame, X_test: pd.DataFrame, 
                           scaler_type: str = 'standard') -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Preprocess features using scaling.
+        Preprocess features using scaling and handle missing values.
         
         Args:
             X_train: Training features
@@ -155,6 +182,10 @@ class MLModels:
         Returns:
             Tuple of (scaled_X_train, scaled_X_test)
         """
+        # Handle missing values first
+        X_train_clean = X_train.fillna(X_train.mean())
+        X_test_clean = X_test.fillna(X_train.mean())  # Use training mean for test data
+        
         if scaler_type == 'standard':
             self.scaler = StandardScaler()
         elif scaler_type == 'robust':
@@ -164,16 +195,16 @@ class MLModels:
         
         # Fit scaler on training data
         X_train_scaled = pd.DataFrame(
-            self.scaler.fit_transform(X_train),
-            columns=X_train.columns,
-            index=X_train.index
+            self.scaler.fit_transform(X_train_clean),
+            columns=X_train_clean.columns,
+            index=X_train_clean.index
         )
         
         # Transform test data
         X_test_scaled = pd.DataFrame(
-            self.scaler.transform(X_test),
-            columns=X_test.columns,
-            index=X_test.index
+            self.scaler.transform(X_test_clean),
+            columns=X_test_clean.columns,
+            index=X_test_clean.index
         )
         
         logger.info(f"Features preprocessed using {scaler_type} scaling")
