@@ -101,6 +101,18 @@ data = data.set_index('datetime')
 clean_data = preprocessor.clean_price_data(data)
 features_df = preprocessor.engineer_features(clean_data)
 
+# Handle missing values (important for ML models)
+print("Handling missing values...")
+print(f"Missing values before: {features_df.isnull().sum().sum()}")
+
+# Fill missing values with forward fill, then backward fill
+features_df = features_df.fillna(method='ffill').fillna(method='bfill')
+
+# If still missing values, fill with mean
+features_df = features_df.fillna(features_df.mean())
+
+print(f"Missing values after: {features_df.isnull().sum().sum()}")
+
 # Prepare training data
 X_train, X_test, y_train, y_test = preprocessor.prepare_training_data(
     target_column='price',
@@ -109,6 +121,8 @@ X_train, X_test, y_train, y_test = preprocessor.prepare_training_data(
 
 print(f"Training data: {X_train.shape}")
 print(f"Test data: {X_test.shape}")
+print(f"Training missing values: {X_train.isnull().sum().sum()}")
+print(f"Test missing values: {X_test.isnull().sum().sum()}")
 ```
 
 ### 6. Train Models
@@ -126,6 +140,30 @@ ml_predictions = ml_models.predict_all(X_test)
 ml_results = ml_models.evaluate_all(y_test, ml_predictions)
 
 print("Models trained successfully!")
+```
+
+### 6.1 Quick Fix for NaN Values (if you get errors)
+```python
+# If you get NaN errors, run this cell to fix the data
+print("Fixing NaN values in training data...")
+print(f"X_train NaN count: {X_train.isnull().sum().sum()}")
+print(f"X_test NaN count: {X_test.isnull().sum().sum()}")
+
+# Fill missing values
+X_train = X_train.fillna(method='ffill').fillna(method='bfill').fillna(X_train.mean())
+X_test = X_test.fillna(method='ffill').fillna(method='bfill').fillna(X_train.mean())
+
+print(f"After fixing - X_train NaN count: {X_train.isnull().sum().sum()}")
+print(f"After fixing - X_test NaN count: {X_test.isnull().sum().sum()}")
+
+# Now retrain the models
+print("Retraining models with clean data...")
+ml_models = MLModels()
+ml_models.train_all(X_train, y_train, tune_hyperparameters=False)
+ml_predictions = ml_models.predict_all(X_test)
+ml_results = ml_models.evaluate_all(y_test, ml_predictions)
+
+print("Models retrained successfully!")
 ```
 
 ### 7. Evaluate and Visualize
