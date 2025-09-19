@@ -97,7 +97,24 @@ print(f"Generated {len(data)} synthetic price records")
 ```python
 # Preprocess data
 preprocessor = DataPreprocessor()
-data = data.set_index('datetime')
+
+# Check data structure first
+print("Data columns:", data.columns.tolist())
+print("Data shape:", data.shape)
+print("First few rows:")
+print(data.head())
+
+# Set datetime as index (check if column exists)
+if 'datetime' in data.columns:
+    data = data.set_index('datetime')
+    print("Set 'datetime' as index")
+elif 'date' in data.columns:
+    data = data.set_index('date')
+    print("Set 'date' as index")
+else:
+    print("Available columns:", data.columns.tolist())
+    print("Please check your data structure")
+
 clean_data = preprocessor.clean_price_data(data)
 features_df = preprocessor.engineer_features(clean_data)
 
@@ -142,7 +159,26 @@ ml_results = ml_models.evaluate_all(y_test, ml_predictions)
 print("Models trained successfully!")
 ```
 
-### 6.1 Quick Fix for NaN Values (if you get errors)
+### 6.1 Quick Fix for Data Issues (if you get errors)
+
+#### Fix 1: Column Name Issues
+```python
+# If you get KeyError about 'datetime' column, run this first
+print("Checking data structure...")
+print("Data columns:", data.columns.tolist())
+print("Data shape:", data.shape)
+
+# Fix column name if needed
+if 'datetime' not in data.columns and 'date' in data.columns:
+    data = data.rename(columns={'date': 'datetime'})
+    print("Renamed 'date' to 'datetime'")
+
+# Set index
+data = data.set_index('datetime')
+print("Data index set successfully")
+```
+
+#### Fix 2: NaN Values
 ```python
 # If you get NaN errors, run this cell to fix the data
 print("Fixing NaN values in training data...")
