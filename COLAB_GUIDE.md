@@ -42,24 +42,72 @@ from evaluation.visualization import ModelVisualization
 print("Libraries imported successfully!")
 ```
 
+### 3.1 Test Your API Token
+```python
+# Test your ENTSO-E API token
+ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+
+print("Testing ENTSO-E API token...")
+downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
+
+try:
+    # Try to download a small sample of data
+    test_data = downloader.download_price_data(
+        country='IT',
+        start_date='2024-01-01',
+        end_date='2024-01-02',  # Just one day for testing
+        data_type='day_ahead'
+    )
+    
+    if not test_data.empty:
+        print("✓ API token is working!")
+        print(f"Downloaded {len(test_data)} test records")
+        print("Sample data:")
+        print(test_data.head())
+    else:
+        print("✗ API token test failed - no data returned")
+        
+except Exception as e:
+    print(f"✗ API token test failed: {e}")
+    print("You may need to wait a bit longer for the token to be activated")
+```
+
 ### 4. Data Collection (Choose One)
 
 #### Option A: Real Data (Requires API Token)
 ```python
 # Set your ENTSO-E API token
-ENTSOE_API_TOKEN = "your_token_here"  # Replace with your actual token
+ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"  # Your actual token
 
-if ENTSOE_API_TOKEN != "your_token_here":
-    downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
+print("Downloading real electricity price data from ENTSO-E...")
+downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
+
+try:
     data = downloader.download_price_data(
-        country='IT',
+        country='IT',  # Italy - you can change to other countries
         start_date='2023-01-01',
         end_date='2024-01-01',
         data_type='day_ahead'
     )
-    print(f"Downloaded {len(data)} real price records")
-else:
-    print("Please set your ENTSO-E API token to download real data")
+    
+    if not data.empty:
+        print(f"✓ Downloaded {len(data)} real price records")
+        print(f"Date range: {data['datetime'].min()} to {data['datetime'].max()}")
+        print(f"Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
+        print("First few rows:")
+        print(data.head())
+    else:
+        print("✗ No data downloaded - trying synthetic data instead")
+        # Fall back to synthetic data
+        data = generate_synthetic_data()
+        print(f"Generated {len(data)} synthetic price records")
+        
+except Exception as e:
+    print(f"✗ Error downloading real data: {e}")
+    print("Falling back to synthetic data...")
+    # Fall back to synthetic data
+    data = generate_synthetic_data()
+    print(f"Generated {len(data)} synthetic price records")
 ```
 
 #### Option B: Synthetic Data (No API Required)
