@@ -269,23 +269,65 @@ if response.status_code == 200:
         import pandas as pd
         
         soup = BeautifulSoup(response.text, 'xml')
+        
+        # Check if this is an Acknowledgement document (no actual data)
+        if soup.find('Acknowledgement_MarketDocument'):
+            print("⚠️  Received Acknowledgement document - this means no data available for this period")
+            print("Let's try a different date range...")
+            
+            # Try a few days ago instead
+            few_days_ago = today - timedelta(days=3)
+            few_days_str = few_days_ago.strftime('%Y%m%d')
+            
+            retry_params = {
+                'documentType': 'A44',
+                'in_Domain': '10Y1001A1001A63L',
+                'out_Domain': '10Y1001A1001A63L',
+                'periodStart': f'{few_days_str}0000',
+                'periodEnd': f'{few_days_str}2359',
+                'securityToken': ENTSOE_API_TOKEN
+            }
+            
+            print(f"Retrying with {few_days_str}...")
+            retry_response = requests.get("https://web-api.tp.entsoe.eu/api", params=retry_params)
+            print(f"Retry response: {retry_response.status_code}")
+            
+            if retry_response.status_code == 200:
+                soup = BeautifulSoup(retry_response.text, 'xml')
+                if not soup.find('Acknowledgement_MarketDocument'):
+                    print("✅ Got actual data on retry!")
+                    response = retry_response
+                else:
+                    print("Still getting Acknowledgement. Let's try a different approach...")
+                    raise Exception("No data available")
+            else:
+                raise Exception("Retry failed")
+        
+        # Look for actual price data
         time_series = soup.find_all('TimeSeries')
+        print(f"Found {len(time_series)} time series in response")
         
         data = []
         for ts in time_series:
             points = ts.find_all('Point')
+            print(f"Processing time series with {len(points)} points")
+            
             for point in points:
-                position = int(point.find('position').text)
-                price = float(point.find('price.amount').text)
-                
-                start_time = ts.find('start').text
-                start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-                actual_dt = start_dt + timedelta(hours=position-1)
-                
-                data.append({
-                    'datetime': actual_dt,
-                    'price': price
-                })
+                try:
+                    position = int(point.find('position').text)
+                    price = float(point.find('price.amount').text)
+                    
+                    start_time = ts.find('start').text
+                    start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                    actual_dt = start_dt + timedelta(hours=position-1)
+                    
+                    data.append({
+                        'datetime': actual_dt,
+                        'price': price
+                    })
+                except Exception as e:
+                    print(f"Error parsing point: {e}")
+                    continue
         
         if data:
             real_data = pd.DataFrame(data)
@@ -299,18 +341,61 @@ if response.status_code == 200:
             data = real_data.copy()
             print("✅ Real data ready for forecasting!")
         else:
-            print("❌ Could not parse real data, falling back to synthetic...")
-            raise Exception("Parse failed")
+            print("❌ No price data found in response")
+            print("Full response for debugging:")
+            print(response.text[:1000])
+            raise Exception("No data found")
             
     except Exception as e:
         print(f"❌ Error parsing real data: {e}")
         print("Falling back to synthetic data...")
-        raise Exception("Parse failed")
+        # Don't raise exception, just continue to synthetic data
 
 # If all real data attempts failed, use synthetic data
-if response.status_code != 200:
+if response.status_code != 200 or 'data' not in locals():
     print("\n🔧 All real data attempts failed. Using synthetic data for demo...")
     print("This is still valuable for demonstrating the forecasting workflow!")
+    
+    # Generate synthetic data as fallback
+    print("\n📊 Generating synthetic electricity price data...")
+    import pandas as pd
+    import numpy as np
+    
+    def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
+        """Generate synthetic electricity price data for demonstration."""
+        dates = pd.date_range(start=start_date, periods=n_samples, freq='H')
+        
+        # Base price with seasonal patterns
+        base_price = 50 + 20 * np.sin(2 * np.pi * np.arange(n_samples) / (24 * 365))  # Annual seasonality
+        base_price += 10 * np.sin(2 * np.pi * np.arange(n_samples) / 24)  # Daily seasonality
+        
+        # Add some realistic volatility
+        noise = np.random.normal(0, 15, n_samples)
+        prices = base_price + noise
+        
+        # Add some extreme spikes (realistic for electricity markets)
+        spike_indices = np.random.choice(n_samples, size=int(0.01 * n_samples), replace=False)
+        prices[spike_indices] *= np.random.uniform(2, 5, len(spike_indices))
+        
+        # Ensure prices are positive
+        prices = np.maximum(prices, 5)
+        
+        data = pd.DataFrame({
+            'datetime': dates,
+            'price': prices,
+            'hour': dates.hour,
+            'day_of_week': dates.dayofweek,
+            'month': dates.month,
+            'year': dates.year
+        })
+        
+        return data
+    
+    data = generate_synthetic_data()
+    print(f"✅ Generated {len(data)} synthetic price records")
+    print("Sample data:")
+    print(data.head())
+    print(f"Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
 ```
 
 ### 3.2.1 Simple API Test - Let's Debug This Step by Step
