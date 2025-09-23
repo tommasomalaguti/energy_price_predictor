@@ -115,6 +115,58 @@ for path in sys.path[-5:]:  # Show last 5 paths
     print(f"  {path}")
 ```
 
+### 3.1.1 Quick Fix for API Token Issue
+```python
+# Quick fix: Update the ENTSOEDownloader to use correct API authentication
+import requests
+
+# Patch the downloader to use securityToken in params instead of headers
+def patch_downloader():
+    """Apply a quick patch to fix the API authentication."""
+    import src.data.entsoe_downloader as entsoe_module
+    
+    # Store the original _download_chunk method
+    original_download_chunk = entsoe_module.ENTSOEDownloader._download_chunk
+    
+    def patched_download_chunk(self, country, start_date, end_date, data_type):
+        """Patched version that uses securityToken in params."""
+        if data_type == 'day_ahead':
+            document_type = 'A44'
+        else:
+            document_type = 'A65'
+        
+        params = {
+            'documentType': document_type,
+            'in_Domain': f'10Y{country}----------',
+            'out_Domain': f'10Y{country}----------',
+            'periodStart': f'{start_date}T00:00Z',
+            'periodEnd': f'{end_date}T23:59Z',
+            'securityToken': self.api_token  # This is the key fix!
+        }
+        
+        try:
+            response = self.session.get(f"{self.BASE_URL}", params=params)
+            response.raise_for_status()
+            
+            # Parse XML response
+            df = self._parse_xml_response(response.text, data_type)
+            return df
+            
+        except requests.exceptions.RequestException as e:
+            print(f"API request failed: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Response status: {e.response.status_code}")
+                print(f"Response text: {e.response.text[:200]}")
+            return pd.DataFrame()
+    
+    # Apply the patch
+    entsoe_module.ENTSOEDownloader._download_chunk = patched_download_chunk
+    print("✓ ENTSOEDownloader patched successfully!")
+
+# Apply the patch
+patch_downloader()
+```
+
 ### 3.2 Test Your API Token
 ```python
 # Test your ENTSO-E API token
@@ -123,38 +175,65 @@ ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
 print("Testing ENTSO-E API token...")
 downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
 
-# First, test the API connection
+# Test API connection manually (since test_api_connection might not be available yet)
 print("Testing API connection...")
-if downloader.test_api_connection():
-    print("✓ API token is valid!")
+import requests
+
+try:
+    # Test the API with a simple request
+    test_params = {
+        'documentType': 'A44',
+        'in_Domain': '10YIT----------',
+        'out_Domain': '10YIT----------',
+        'periodStart': '2024-01-01T00:00Z',
+        'periodEnd': '2024-01-01T23:59Z',
+        'securityToken': ENTSOE_API_TOKEN
+    }
     
-    # Now try to download a small sample of data
-    print("Downloading test data...")
-    try:
-        test_data = downloader.download_price_data(
-            country='IT',
-            start_date='2024-01-01',
-            end_date='2024-01-02',  # Just one day for testing
-            data_type='day_ahead'
-        )
+    response = requests.get("https://web-api.tp.entsoe.eu/api", params=test_params)
+    print(f"API Response Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        print("✓ API token is valid!")
         
-        if not test_data.empty:
-            print("✓ Data download successful!")
-            print(f"Downloaded {len(test_data)} test records")
-            print("Sample data:")
-            print(test_data.head())
-        else:
-            print("✗ No data returned - API may be working but no data available for this period")
+        # Now try to download a small sample of data
+        print("Downloading test data...")
+        try:
+            test_data = downloader.download_price_data(
+                country='IT',
+                start_date='2024-01-01',
+                end_date='2024-01-02',  # Just one day for testing
+                data_type='day_ahead'
+            )
             
-    except Exception as e:
-        print(f"✗ Data download failed: {e}")
-else:
-    print("✗ API token test failed")
+            if not test_data.empty:
+                print("✓ Data download successful!")
+                print(f"Downloaded {len(test_data)} test records")
+                print("Sample data:")
+                print(test_data.head())
+            else:
+                print("✗ No data returned - API may be working but no data available for this period")
+                
+        except Exception as e:
+            print(f"✗ Data download failed: {e}")
+            
+    elif response.status_code == 401:
+        print("✗ API token is invalid or not activated")
+        print("Response:", response.text[:200])
+        print("Possible reasons:")
+        print("1. Token not activated yet (wait 3 business days)")
+        print("2. Token is invalid")
+        print("3. Token format is incorrect")
+    else:
+        print(f"✗ Unexpected response: {response.status_code}")
+        print("Response:", response.text[:200])
+        
+except Exception as e:
+    print(f"✗ API test failed: {e}")
     print("Possible reasons:")
-    print("1. Token not activated yet (wait 3 business days)")
-    print("2. Token is invalid")
-    print("3. Network connectivity issues")
-    print("4. ENTSO-E API is temporarily unavailable")
+    print("1. Network connectivity issues")
+    print("2. ENTSO-E API is temporarily unavailable")
+    print("3. Token not activated yet")
 ```
 
 ### 4. Data Collection (Choose One)
