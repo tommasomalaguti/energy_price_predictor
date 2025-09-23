@@ -192,28 +192,25 @@ print("🔍 Getting real electricity price data...")
 def get_real_data():
     """Get real electricity price data from ENTSO-E API."""
     
-    # Test different countries and date ranges
+    # Focus on Italy only for maximum data collection
     countries = {
-        'France': '10YFR-RTE------C',
-        'Netherlands': '10YNL----------L', 
-        'Spain': '10YES-REE------0',
-        'Germany': '10Y1001A1001A63L'
+        'Italy': '10YIT----------'
     }
     
-    # Try to get data over multiple days for more records
-    print("🔄 Attempting to collect data over multiple days...")
+    # Try to get data over extended period for maximum records
+    print("🔄 Attempting to collect data over extended period for Italy...")
     
     for country_name, domain_code in countries.items():
         print(f"\n🌍 Trying {country_name}...")
         
-        # Try to get data for the last 7 days
+        # Try to get data for the last 90 days (maximum practical range)
         all_data = []
         today = datetime.now()
         
-        for days_back in range(1, 8):  # Try last 7 days
+        for days_back in range(1, 91):  # Try last 90 days for maximum data
             test_date = today - timedelta(days=days_back)
             date_str = test_date.strftime('%Y%m%d')
-            print(f"  📅 {days_back} days ago ({date_str})...")
+            print(f"  📅 {days_back} days ago ({date_str})... [{days_back}/90]")
             
             # API request parameters
             params = {
@@ -282,23 +279,23 @@ def get_real_data():
 def get_real_data_single_day():
     """Get real electricity price data from ENTSO-E API (single day approach)."""
     
-    # Test different countries and date ranges
+    # Focus on Italy only
     countries = {
-        'France': '10YFR-RTE------C',
-        'Netherlands': '10YNL----------L', 
-        'Spain': '10YES-REE------0',
-        'Germany': '10Y1001A1001A63L'
+        'Italy': '10YIT----------'
     }
     
     # Try different date ranges - extended periods for more data
     today = datetime.now()
     date_ranges = {
-        'Last 3 days': today - timedelta(days=3),
-        'Last week': today - timedelta(days=7),
+        'Yesterday': today - timedelta(days=1),
+        '2 days ago': today - timedelta(days=2),
+        '3 days ago': today - timedelta(days=3),
+        '1 week ago': today - timedelta(days=7),
         '2 weeks ago': today - timedelta(days=14),
         '3 weeks ago': today - timedelta(days=21),
         '1 month ago': today - timedelta(days=30),
-        '2 months ago': today - timedelta(days=60)
+        '2 months ago': today - timedelta(days=60),
+        '3 months ago': today - timedelta(days=90)
     }
     
     for country_name, domain_code in countries.items():
