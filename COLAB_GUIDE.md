@@ -628,40 +628,23 @@ except Exception as e:
 
 ### 4. Data Collection (Choose One)
 
-#### Option A: Real Data (Requires API Token)
+**Note**: If you ran Block 3.2 successfully, you already have real data loaded! You can skip to Block 5 (Data Preprocessing) or run Option A below to confirm your data.
+
+#### Option A: Real Data (Already Done in Block 3.2)
 ```python
-# Set your ENTSO-E API token
-ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"  # Your actual token
+# ✅ Real data is already loaded from Block 3.2!
+# If you ran Block 3.2, you already have real electricity price data
+# The 'data' variable is ready to use
 
-print("Downloading real electricity price data from ENTSO-E...")
-downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
+print("✅ Using real data from Block 3.2")
+print(f"Records: {len(data)}")
+print(f"Date range: {data['datetime'].min()} to {data['datetime'].max()}")
+print(f"Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
+print("\nSample data:")
+print(data.head())
 
-try:
-    data = downloader.download_price_data(
-        country='IT',  # Italy - you can change to other countries
-        start_date='2023-01-01',
-        end_date='2024-01-01',
-        data_type='day_ahead'
-    )
-    
-    if not data.empty:
-        print(f"✓ Downloaded {len(data)} real price records")
-        print(f"Date range: {data['datetime'].min()} to {data['datetime'].max()}")
-        print(f"Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
-        print("First few rows:")
-        print(data.head())
-    else:
-        print("✗ No data downloaded - trying synthetic data instead")
-        # Fall back to synthetic data
-        data = generate_synthetic_data()
-        print(f"Generated {len(data)} synthetic price records")
-        
-except Exception as e:
-    print(f"✗ Error downloading real data: {e}")
-    print("Falling back to synthetic data...")
-    # Fall back to synthetic data
-    data = generate_synthetic_data()
-    print(f"Generated {len(data)} synthetic price records")
+# If you didn't run Block 3.2, you can run it now:
+# Just go back to Block 3.2 and run that cell first!
 ```
 
 #### Option B: Synthetic Data (No API Required)
