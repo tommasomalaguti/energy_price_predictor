@@ -200,13 +200,105 @@ def get_real_data():
         'Germany': '10Y1001A1001A63L'
     }
     
-    # Try different date ranges
+    # Try to get data over multiple days for more records
+    print("🔄 Attempting to collect data over multiple days...")
+    
+    for country_name, domain_code in countries.items():
+        print(f"\n🌍 Trying {country_name}...")
+        
+        # Try to get data for the last 7 days
+        all_data = []
+        today = datetime.now()
+        
+        for days_back in range(1, 8):  # Try last 7 days
+            test_date = today - timedelta(days=days_back)
+            date_str = test_date.strftime('%Y%m%d')
+            print(f"  📅 {days_back} days ago ({date_str})...")
+            
+            # API request parameters
+            params = {
+                'documentType': 'A44',
+                'in_Domain': domain_code,
+                'out_Domain': domain_code,
+                'periodStart': f'{date_str}0000',
+                'periodEnd': f'{date_str}2359',
+                'securityToken': ENTSOE_API_TOKEN
+            }
+            
+            try:
+                response = requests.get("https://web-api.tp.entsoe.eu/api", params=params, timeout=30)
+                print(f"    Status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    # Parse XML response
+                    soup = BeautifulSoup(response.text, 'xml')
+                    
+                    # Check if it's an Acknowledgement document (no data)
+                    if soup.find('Acknowledgement_MarketDocument'):
+                        print(f"    ❌ No data available")
+                        continue
+                    
+                    # Look for actual price data
+                    time_series = soup.find_all('TimeSeries')
+                    print(f"    📊 Found {len(time_series)} time series")
+                    
+                    if time_series:
+                        # Parse the data
+                        day_data = parse_price_data(soup)
+                        
+                        if day_data is not None and len(day_data) > 0:
+                            print(f"    ✅ Got {len(day_data)} records")
+                            all_data.append(day_data)
+                        else:
+                            print(f"    ❌ No price data found")
+                    else:
+                        print(f"    ❌ No time series found")
+                        
+            except Exception as e:
+                print(f"    ❌ Error: {e}")
+                continue
+        
+        # If we got data from multiple days, combine it
+        if all_data:
+            combined_data = pd.concat(all_data, ignore_index=True)
+            combined_data = combined_data.sort_values('datetime').reset_index(drop=True)
+            
+            print(f"✅ SUCCESS! Combined {len(combined_data)} records from {len(all_data)} days")
+            print(f"💰 Price range: €{combined_data['price'].min():.2f} - €{combined_data['price'].max():.2f}/MWh")
+            print(f"📅 Date range: {combined_data['datetime'].min()} to {combined_data['datetime'].max()}")
+            
+            # Add time features
+            combined_data['hour'] = combined_data['datetime'].dt.hour
+            combined_data['day_of_week'] = combined_data['datetime'].dt.dayofweek
+            combined_data['month'] = combined_data['datetime'].dt.month
+            combined_data['year'] = combined_data['datetime'].dt.year
+            
+            print(f"✅ Real data from {country_name} ready!")
+            return combined_data
+    
+    print("\n🔧 No real data found. Using synthetic data...")
+    return generate_synthetic_data()
+
+def get_real_data_single_day():
+    """Get real electricity price data from ENTSO-E API (single day approach)."""
+    
+    # Test different countries and date ranges
+    countries = {
+        'France': '10YFR-RTE------C',
+        'Netherlands': '10YNL----------L', 
+        'Spain': '10YES-REE------0',
+        'Germany': '10Y1001A1001A63L'
+    }
+    
+    # Try different date ranges - extended periods for more data
     today = datetime.now()
     date_ranges = {
-        'Yesterday': today - timedelta(days=1),
-        '1 week ago': today - timedelta(days=7),
+        'Last 3 days': today - timedelta(days=3),
+        'Last week': today - timedelta(days=7),
         '2 weeks ago': today - timedelta(days=14),
-        '1 month ago': today - timedelta(days=30)
+        '3 weeks ago': today - timedelta(days=21),
+        '1 month ago': today - timedelta(days=30),
+        '2 months ago': today - timedelta(days=60)
     }
     
     for country_name, domain_code in countries.items():
@@ -341,8 +433,14 @@ def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
     print(f"✅ Generated {len(data)} synthetic price records")
     return data
 
-# Get the data (real or synthetic)
+# Get the data (real or synthetic) - try multi-day approach first
+print("🔄 Trying to get data over multiple days for more records...")
 data = get_real_data()
+
+# If we didn't get much data, try single day approach
+if len(data) < 100:
+    print(f"\n⚠️ Only got {len(data)} records. Trying single day approach...")
+    data = get_real_data_single_day()
 
 print(f"\n🎉 Data ready!")
 print(f"Records: {len(data)}")
