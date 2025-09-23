@@ -19,7 +19,11 @@ print("Setup complete!")
 ### 3. Import Libraries
 ```python
 import sys
+import os
+
+# Add the src directory to Python path
 sys.path.append('src')
+sys.path.append('.')
 
 import pandas as pd
 import numpy as np
@@ -30,19 +34,88 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-# Import our modules
-from data.entsoe_downloader import ENTSOEDownloader
-from data.preprocessor import DataPreprocessor
-from models.baseline_models import BaselineModels
-from models.ml_models import MLModels
-from models.time_series_models import TimeSeriesModels
-from evaluation.metrics import EvaluationMetrics
-from evaluation.visualization import ModelVisualization
+# Check if we can find our modules
+print("Checking module paths...")
+print("Current directory:", os.getcwd())
+print("Files in current directory:", os.listdir('.'))
+if os.path.exists('src'):
+    print("Files in src directory:", os.listdir('src'))
+    if os.path.exists('src/data'):
+        print("Files in src/data directory:", os.listdir('src/data'))
+    if os.path.exists('src/models'):
+        print("Files in src/models directory:", os.listdir('src/models'))
 
-print("Libraries imported successfully!")
+# Import our modules with proper error handling
+try:
+    from src.data.entsoe_downloader import ENTSOEDownloader
+    from src.data.preprocessor import DataPreprocessor
+    from src.models.baseline_models import BaselineModels
+    from src.models.ml_models import MLModels
+    from src.models.time_series_models import TimeSeriesModels
+    from src.evaluation.metrics import EvaluationMetrics
+    from src.evaluation.visualization import ModelVisualization
+    print("✓ All modules imported successfully!")
+except ImportError as e:
+    print(f"✗ Import error: {e}")
+    print("Trying alternative import paths...")
+    
+    # Try alternative import paths
+    try:
+        from data.entsoe_downloader import ENTSOEDownloader
+        from data.preprocessor import DataPreprocessor
+        from models.baseline_models import BaselineModels
+        from models.ml_models import MLModels
+        from models.time_series_models import TimeSeriesModels
+        from evaluation.metrics import EvaluationMetrics
+        from evaluation.visualization import ModelVisualization
+        print("✓ Modules imported with alternative paths!")
+    except ImportError as e2:
+        print(f"✗ Alternative import also failed: {e2}")
+        print("Please check the file structure and try again.")
 ```
 
-### 3.1 Test Your API Token
+### 3.1 Quick Fix for Import Issues
+```python
+# If you're getting import errors, run this cell first
+import os
+import sys
+
+# Check current directory structure
+print("Current working directory:", os.getcwd())
+print("\nDirectory contents:")
+for item in os.listdir('.'):
+    print(f"  {item}")
+
+# Check if src directory exists and what's in it
+if os.path.exists('src'):
+    print("\nsrc directory contents:")
+    for item in os.listdir('src'):
+        print(f"  {item}")
+        
+    # Check subdirectories
+    for subdir in ['data', 'models', 'evaluation']:
+        if os.path.exists(f'src/{subdir}'):
+            print(f"\nsrc/{subdir} directory contents:")
+            for item in os.listdir(f'src/{subdir}'):
+                print(f"  {item}")
+else:
+    print("\n❌ src directory not found!")
+    print("Make sure you're in the energy_price_predictor directory")
+    print("Run: %cd energy_price_predictor")
+
+# Add all necessary paths
+sys.path.append('.')
+sys.path.append('src')
+sys.path.append('src/data')
+sys.path.append('src/models')
+sys.path.append('src/evaluation')
+
+print(f"\nPython path updated. Current sys.path:")
+for path in sys.path[-5:]:  # Show last 5 paths
+    print(f"  {path}")
+```
+
+### 3.2 Test Your API Token
 ```python
 # Test your ENTSO-E API token
 ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
