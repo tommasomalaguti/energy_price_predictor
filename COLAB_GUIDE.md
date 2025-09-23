@@ -123,26 +123,38 @@ ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
 print("Testing ENTSO-E API token...")
 downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
 
-try:
-    # Try to download a small sample of data
-    test_data = downloader.download_price_data(
-        country='IT',
-        start_date='2024-01-01',
-        end_date='2024-01-02',  # Just one day for testing
-        data_type='day_ahead'
-    )
+# First, test the API connection
+print("Testing API connection...")
+if downloader.test_api_connection():
+    print("✓ API token is valid!")
     
-    if not test_data.empty:
-        print("✓ API token is working!")
-        print(f"Downloaded {len(test_data)} test records")
-        print("Sample data:")
-        print(test_data.head())
-    else:
-        print("✗ API token test failed - no data returned")
+    # Now try to download a small sample of data
+    print("Downloading test data...")
+    try:
+        test_data = downloader.download_price_data(
+            country='IT',
+            start_date='2024-01-01',
+            end_date='2024-01-02',  # Just one day for testing
+            data_type='day_ahead'
+        )
         
-except Exception as e:
-    print(f"✗ API token test failed: {e}")
-    print("You may need to wait a bit longer for the token to be activated")
+        if not test_data.empty:
+            print("✓ Data download successful!")
+            print(f"Downloaded {len(test_data)} test records")
+            print("Sample data:")
+            print(test_data.head())
+        else:
+            print("✗ No data returned - API may be working but no data available for this period")
+            
+    except Exception as e:
+        print(f"✗ Data download failed: {e}")
+else:
+    print("✗ API token test failed")
+    print("Possible reasons:")
+    print("1. Token not activated yet (wait 3 business days)")
+    print("2. Token is invalid")
+    print("3. Network connectivity issues")
+    print("4. ENTSO-E API is temporarily unavailable")
 ```
 
 ### 4. Data Collection (Choose One)

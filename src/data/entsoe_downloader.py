@@ -73,8 +73,7 @@ class ENTSOEDownloader:
         
         self.session = requests.Session()
         self.session.headers.update({
-            'Content-Type': 'application/xml',
-            'SecurityToken': self.api_token
+            'Content-Type': 'application/xml'
         })
     
     def _load_api_token(self) -> Optional[str]:
@@ -172,11 +171,22 @@ class ENTSOEDownloader:
             'in_Domain': f'10Y{country}----------',
             'out_Domain': f'10Y{country}----------',
             'periodStart': f'{start_date}T00:00Z',
-            'periodEnd': f'{end_date}T23:59Z'
+            'periodEnd': f'{end_date}T23:59Z',
+            'securityToken': self.api_token
         }
         
         try:
+            logger.info(f"Making API request with params: {params}")
             response = self.session.get(f"{self.BASE_URL}", params=params)
+            
+            logger.info(f"Response status: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            
+            if response.status_code == 401:
+                logger.error("401 Unauthorized - Check your API token")
+                logger.error(f"Response text: {response.text[:500]}")
+                return pd.DataFrame()
+            
             response.raise_for_status()
             
             # Parse XML response
@@ -185,6 +195,9 @@ class ENTSOEDownloader:
             
         except requests.exceptions.RequestException as e:
             logger.error(f"API request failed: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response text: {e.response.text[:500]}")
             return pd.DataFrame()
     
     def _parse_xml_response(self, xml_content: str, data_type: str) -> pd.DataFrame:
@@ -260,6 +273,35 @@ class ENTSOEDownloader:
             logger.warning("Date range is longer than 1 year. Consider downloading in smaller chunks.")
         
         return True
+    
+    def test_api_connection(self) -> bool:
+        """Test if the API token is valid by making a simple request."""
+        try:
+            # Try to get a small amount of data
+            test_params = {
+                'documentType': 'A44',
+                'in_Domain': '10YIT----------',
+                'out_Domain': '10YIT----------',
+                'periodStart': '2024-01-01T00:00Z',
+                'periodEnd': '2024-01-01T23:59Z',
+                'securityToken': self.api_token
+            }
+            
+            response = self.session.get(f"{self.BASE_URL}", params=test_params)
+            
+            if response.status_code == 200:
+                logger.info("✓ API token is valid")
+                return True
+            elif response.status_code == 401:
+                logger.error("✗ API token is invalid or not activated")
+                return False
+            else:
+                logger.warning(f"Unexpected response: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"API test failed: {e}")
+            return False
 
 
 def main():
