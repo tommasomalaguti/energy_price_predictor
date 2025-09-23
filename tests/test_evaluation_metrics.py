@@ -18,14 +18,15 @@ class TestEvaluationMetrics:
     
     def test_rmse_calculation(self):
         """Test RMSE calculation."""
-        y_true = np.array([1, 2, 3, 4, 5])
+        y_true = pd.Series([1, 2, 3, 4, 5])
         y_pred = np.array([1.1, 1.9, 3.1, 3.9, 5.1])
         
-        rmse = EvaluationMetrics.calculate_rmse(y_true, y_pred)
-        expected_rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
+        metrics = EvaluationMetrics()
+        results = metrics.calculate_all_metrics(y_true, y_pred)
         
-        assert abs(rmse - expected_rmse) < 1e-10
-        assert rmse >= 0
+        expected_rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
+        assert abs(results['rmse'] - expected_rmse) < 1e-10
+        assert results['rmse'] >= 0
     
     def test_mae_calculation(self):
         """Test MAE calculation."""
