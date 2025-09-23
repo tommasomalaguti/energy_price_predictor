@@ -85,7 +85,7 @@ def test_entsoe_api():
                         # Try to parse the data
                         data = parse_price_data(soup)
                         
-                        if data and len(data) > 0:
+                        if data is not None and len(data) > 0:
                             print(f"    ✅ SUCCESS! Parsed {len(data)} price records")
                             print(f"    💰 Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
                             print(f"    📅 Date range: {data['datetime'].min()} to {data['datetime'].max()}")
@@ -159,7 +159,7 @@ def parse_price_data(soup):
                     print(f"      Error parsing point: {e}")
                     continue
         
-        if data:
+        if data and len(data) > 0:
             df = pd.DataFrame(data)
             df = df.sort_values('datetime').reset_index(drop=True)
             return df
