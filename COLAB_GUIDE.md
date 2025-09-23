@@ -192,25 +192,28 @@ print("🔍 Getting real electricity price data...")
 def get_real_data():
     """Get real electricity price data from ENTSO-E API."""
     
-    # Focus on Italy only for maximum data collection
+    # Try working countries first, then Italy
     countries = {
+        'France': '10YFR-RTE------C',
+        'Netherlands': '10YNL----------L', 
+        'Spain': '10YES-REE------0',
         'Italy': '10YIT----------'
     }
     
     # Try to get data over extended period for maximum records
-    print("🔄 Attempting to collect data over extended period for Italy...")
+    print("🔄 Attempting to collect data over extended period...")
     
     for country_name, domain_code in countries.items():
         print(f"\n🌍 Trying {country_name}...")
         
-        # Try to get data for the last 90 days (maximum practical range)
+        # Try to get data for the last 30 days (more reasonable range)
         all_data = []
         today = datetime.now()
         
-        for days_back in range(1, 91):  # Try last 90 days for maximum data
+        for days_back in range(1, 31):  # Try last 30 days for maximum data
             test_date = today - timedelta(days=days_back)
             date_str = test_date.strftime('%Y%m%d')
-            print(f"  📅 {days_back} days ago ({date_str})... [{days_back}/90]")
+            print(f"  📅 {days_back} days ago ({date_str})... [{days_back}/30]")
             
             # API request parameters
             params = {
