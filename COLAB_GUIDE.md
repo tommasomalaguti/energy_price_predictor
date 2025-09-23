@@ -167,7 +167,153 @@ def patch_downloader():
 patch_downloader()
 ```
 
-### 3.2 Simple API Test - Let's Debug This Step by Step
+### 3.2 Real Data Test - Updated Approach Based on Research
+```python
+# Let's try real data with corrected parameters based on ENTSO-E API research
+import requests
+from datetime import datetime, timedelta
+
+ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+
+print("🔍 Trying real data with corrected parameters...")
+
+# Test 1: Try Germany with correct domain code and recent date
+print("\n1. Testing Germany with correct domain code...")
+today = datetime.now()
+yesterday = today - timedelta(days=1)
+yesterday_str = yesterday.strftime('%Y%m%d')
+
+# Use the correct German domain code from research
+de_corrected_params = {
+    'documentType': 'A44',
+    'in_Domain': '10Y1001A1001A63L',  # Correct German domain code
+    'out_Domain': '10Y1001A1001A63L',
+    'periodStart': f'{yesterday_str}0000',
+    'periodEnd': f'{yesterday_str}2359',
+    'securityToken': ENTSOE_API_TOKEN
+}
+
+response = requests.get("https://web-api.tp.entsoe.eu/api", params=de_corrected_params)
+print(f"Germany corrected: {response.status_code}")
+if response.status_code == 200:
+    print("✅ SUCCESS! Real data from Germany!")
+    print("Response preview:", response.text[:300])
+else:
+    print(f"Response: {response.text[:300]}")
+
+# Test 2: Try with even smaller time window (just 6 hours)
+if response.status_code != 200:
+    print("\n2. Trying smaller time window (6 hours)...")
+    small_window_params = {
+        'documentType': 'A44',
+        'in_Domain': '10Y1001A1001A63L',
+        'out_Domain': '10Y1001A1001A63L',
+        'periodStart': f'{yesterday_str}0000',
+        'periodEnd': f'{yesterday_str}0600',  # Only 6 hours
+        'securityToken': ENTSOE_API_TOKEN
+    }
+    
+    response = requests.get("https://web-api.tp.entsoe.eu/api", params=small_window_params)
+    print(f"Small window: {response.status_code}")
+    if response.status_code == 200:
+        print("✅ SUCCESS with smaller window!")
+        print("Response preview:", response.text[:300])
+    else:
+        print(f"Response: {response.text[:300]}")
+
+# Test 3: Try France with correct domain code
+if response.status_code != 200:
+    print("\n3. Trying France with correct domain code...")
+    fr_params = {
+        'documentType': 'A44',
+        'in_Domain': '10YFR-RTE------C',  # French domain code
+        'out_Domain': '10YFR-RTE------C',
+        'periodStart': f'{yesterday_str}0000',
+        'periodEnd': f'{yesterday_str}0600',
+        'securityToken': ENTSOE_API_TOKEN
+    }
+    
+    response = requests.get("https://web-api.tp.entsoe.eu/api", params=fr_params)
+    print(f"France: {response.status_code}")
+    if response.status_code == 200:
+        print("✅ SUCCESS with France!")
+        print("Response preview:", response.text[:300])
+    else:
+        print(f"Response: {response.text[:300]}")
+
+# Test 4: Try Netherlands
+if response.status_code != 200:
+    print("\n4. Trying Netherlands...")
+    nl_params = {
+        'documentType': 'A44',
+        'in_Domain': '10YNL----------L',  # Dutch domain code
+        'out_Domain': '10YNL----------L',
+        'periodStart': f'{yesterday_str}0000',
+        'periodEnd': f'{yesterday_str}0600',
+        'securityToken': ENTSOE_API_TOKEN
+    }
+    
+    response = requests.get("https://web-api.tp.entsoe.eu/api", params=nl_params)
+    print(f"Netherlands: {response.status_code}")
+    if response.status_code == 200:
+        print("✅ SUCCESS with Netherlands!")
+        print("Response preview:", response.text[:300])
+    else:
+        print(f"Response: {response.text[:300]}")
+
+# If we got real data, let's try to parse it
+if response.status_code == 200:
+    print("\n🎉 REAL DATA SUCCESS! Let's parse it...")
+    try:
+        from bs4 import BeautifulSoup
+        import pandas as pd
+        
+        soup = BeautifulSoup(response.text, 'xml')
+        time_series = soup.find_all('TimeSeries')
+        
+        data = []
+        for ts in time_series:
+            points = ts.find_all('Point')
+            for point in points:
+                position = int(point.find('position').text)
+                price = float(point.find('price.amount').text)
+                
+                start_time = ts.find('start').text
+                start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                actual_dt = start_dt + timedelta(hours=position-1)
+                
+                data.append({
+                    'datetime': actual_dt,
+                    'price': price
+                })
+        
+        if data:
+            real_data = pd.DataFrame(data)
+            real_data = real_data.sort_values('datetime').reset_index(drop=True)
+            print(f"✅ Parsed {len(real_data)} real price records!")
+            print("Sample real data:")
+            print(real_data.head())
+            print(f"Price range: €{real_data['price'].min():.2f} - €{real_data['price'].max():.2f}/MWh")
+            
+            # Set this as our data for the rest of the workflow
+            data = real_data.copy()
+            print("✅ Real data ready for forecasting!")
+        else:
+            print("❌ Could not parse real data, falling back to synthetic...")
+            raise Exception("Parse failed")
+            
+    except Exception as e:
+        print(f"❌ Error parsing real data: {e}")
+        print("Falling back to synthetic data...")
+        raise Exception("Parse failed")
+
+# If all real data attempts failed, use synthetic data
+if response.status_code != 200:
+    print("\n🔧 All real data attempts failed. Using synthetic data for demo...")
+    print("This is still valuable for demonstrating the forecasting workflow!")
+```
+
+### 3.2.1 Simple API Test - Let's Debug This Step by Step
 ```python
 # Let's debug the ENTSO-E API step by step
 import requests
