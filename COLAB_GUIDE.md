@@ -63,9 +63,9 @@ try:
     from src.models.time_series_models import TimeSeriesModels
     from src.evaluation.metrics import EvaluationMetrics
     from src.evaluation.visualization import ModelVisualization
-    print("✓ All modules imported successfully!")
+    print("All modules imported successfully!")
 except ImportError as e:
-    print(f"✗ Import error: {e}")
+    print(f"Import error: {e}")
     print("Trying alternative import paths...")
     
     # Try alternative import paths
@@ -77,9 +77,9 @@ except ImportError as e:
         from models.time_series_models import TimeSeriesModels
         from evaluation.metrics import EvaluationMetrics
         from evaluation.visualization import ModelVisualization
-        print("✓ Modules imported with alternative paths!")
+        print("Modules imported with alternative paths!")
     except ImportError as e2:
-        print(f"✗ Alternative import also failed: {e2}")
+        print(f"Alternative import also failed: {e2}")
         print("Please check the file structure and try again.")
 ```
 
@@ -170,7 +170,7 @@ def patch_downloader():
     
     # Apply the patch
     entsoe_module.ENTSOEDownloader._download_chunk = patched_download_chunk
-    print("✓ ENTSOEDownloader patched successfully!")
+    print("ENTSOEDownloader patched successfully!")
 
 # Apply the patch
 patch_downloader()
@@ -439,7 +439,7 @@ data = get_real_data()
 
 # If we didn't get much data, try single day approach
 if len(data) < 100:
-    print(f"\n⚠ Only got {len(data)} records. Trying single day approach...")
+    print(f"\nOnly got {len(data)} records. Trying single day approach...")
     data = get_real_data_single_day()
 
 print(f"\n Data ready!")
@@ -606,7 +606,7 @@ response = requests.get("https://web-api.tp.entsoe.eu/api", params=test_params)
 print(f"API Response Status: {response.status_code}")
 
 if response.status_code == 200:
-    print("✓ API is working with correct date format!")
+    print("API is working with correct date format!")
     print("Response preview:", response.text[:200])
 elif response.status_code == 400:
     print("Still getting 400 error. Let's try a different approach...")
@@ -626,7 +626,7 @@ elif response.status_code == 400:
     response2 = requests.get("https://web-api.tp.entsoe.eu/api", params=recent_params)
     print(f"Recent date response: {response2.status_code}")
     if response2.status_code == 200:
-        print("✓ API works with recent date!")
+        print("API works with recent date!")
         print("Response preview:", response2.text[:200])
     else:
         print("Still 400. Let's try Germany instead...")
@@ -644,7 +644,7 @@ elif response.status_code == 400:
         response3 = requests.get("https://web-api.tp.entsoe.eu/api", params=de_params)
         print(f"Germany response: {response3.status_code}")
         if response3.status_code == 200:
-            print("✓ API works with Germany!")
+            print("API works with Germany!")
             print("Response preview:", response3.text[:200])
         else:
             print("Still having issues. Full response:", response3.text[:500])
@@ -682,7 +682,7 @@ try:
     print(f"API Response Status: {response.status_code}")
     
     if response.status_code == 200:
-        print("✓ API token is valid!")
+        print("API token is valid!")
         
         # Now try to download a small sample of data
         print("Downloading test data...")
@@ -695,29 +695,29 @@ try:
             )
             
             if not test_data.empty:
-                print("✓ Data download successful!")
+                print("Data download successful!")
                 print(f"Downloaded {len(test_data)} test records")
                 print("Sample data:")
                 print(test_data.head())
             else:
-                print("✗ No data returned - API may be working but no data available for this period")
+                print("No data returned - API may be working but no data available for this period")
                 
         except Exception as e:
-            print(f"✗ Data download failed: {e}")
+            print(f"Data download failed: {e}")
             
     elif response.status_code == 401:
-        print("✗ API token is invalid or not activated")
+        print("API token is invalid or not activated")
         print("Response:", response.text[:200])
         print("Possible reasons:")
         print("1. Token not activated yet (wait 3 business days)")
         print("2. Token is invalid")
         print("3. Token format is incorrect")
     else:
-        print(f"✗ Unexpected response: {response.status_code}")
+        print(f"Unexpected response: {response.status_code}")
         print("Response:", response.text[:200])
         
 except Exception as e:
-    print(f"✗ API test failed: {e}")
+    print(f"API test failed: {e}")
     print("Possible reasons:")
     print("1. Network connectivity issues")
     print("2. ENTSO-E API is temporarily unavailable")

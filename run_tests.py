@@ -20,13 +20,13 @@ def run_command(cmd, description):
     
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print("✅ SUCCESS")
+        print("SUCCESS")
         if result.stdout:
             print("Output:")
             print(result.stdout)
         return True
     except subprocess.CalledProcessError as e:
-        print("❌ FAILED")
+        print("FAILED")
         print(f"Error: {e}")
         if e.stdout:
             print("Output:")
@@ -82,13 +82,13 @@ def main():
     success = run_command(cmd, "Running tests")
     
     if success:
-        print("\n🎉 All tests passed!")
+        print("\nAll tests passed!")
         
         # Show coverage report location if coverage was run
         if args.coverage:
-            print("\n📊 Coverage report generated in htmlcov/index.html")
+            print("\nCoverage report generated in htmlcov/index.html")
     else:
-        print("\n💥 Some tests failed!")
+        print("\nSome tests failed!")
         sys.exit(1)
 
 

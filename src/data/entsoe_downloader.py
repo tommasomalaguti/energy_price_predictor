@@ -290,10 +290,10 @@ class ENTSOEDownloader:
             response = self.session.get(f"{self.BASE_URL}", params=test_params)
             
             if response.status_code == 200:
-                logger.info("✓ API token is valid")
+                logger.info("API token is valid")
                 return True
             elif response.status_code == 401:
-                logger.error("✗ API token is invalid or not activated")
+                logger.error("API token is invalid or not activated")
                 return False
             else:
                 logger.warning(f"Unexpected response: {response.status_code}")
