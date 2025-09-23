@@ -827,13 +827,38 @@ print(f"Test missing values: {X_test.isnull().sum().sum()}")
 
 ### 6. Train Models
 ```python
+import numpy as np
+
 # Train baseline models
 baseline_models = BaselineModels()
 baseline_models.train_all(X_train, y_train)
 baseline_predictions = baseline_models.predict_all(X_test)
 baseline_results = baseline_models.evaluate_all(y_test, baseline_predictions)
 
+# Quick Fix for Infinity/Large Values
+print("🔧 Handling infinity and extreme values...")
+
+# Check for infinity values
+print(f"Infinity values in X_train: {np.isinf(X_train).sum().sum()}")
+print(f"Infinity values in X_test: {np.isinf(X_test).sum().sum()}")
+
+# Replace infinity with NaN, then fill with median
+X_train = X_train.replace([np.inf, -np.inf], np.nan)
+X_test = X_test.replace([np.inf, -np.inf], np.nan)
+
+# Fill NaN values with median (more robust than mean for extreme values)
+X_train = X_train.fillna(X_train.median())
+X_test = X_test.fillna(X_train.median())  # Use training median for test data
+
+print(f"After cleaning - Infinity values in X_train: {np.isinf(X_train).sum().sum()}")
+print(f"After cleaning - Infinity values in X_test: {np.isinf(X_test).sum().sum()}")
+
+# Check for extremely large values
+print(f"Max value in X_train: {X_train.max().max():.2f}")
+print(f"Min value in X_train: {X_train.min().min():.2f}")
+
 # Train ML models
+print("🚀 Training ML models...")
 ml_models = MLModels()
 ml_models.train_all(X_train, y_train, tune_hyperparameters=False)
 ml_predictions = ml_models.predict_all(X_test)
