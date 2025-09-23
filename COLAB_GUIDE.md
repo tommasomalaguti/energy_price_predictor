@@ -1,13 +1,13 @@
 # Google Colab Setup Guide
 
-## ✅ **WORKING SOLUTION CONFIRMED!**
+## **WORKING SOLUTION CONFIRMED!**
 
 We have successfully tested the ENTSO-E API locally and confirmed it works! The updated code in this guide will:
-- ✅ Get real electricity price data from France, Netherlands, Spain, or Germany
-- ✅ Handle API authentication correctly
-- ✅ Parse XML responses properly
-- ✅ Fall back to synthetic data if needed
-- ✅ Work reliably in Google Colab
+- Get real electricity price data from France, Netherlands, Spain, or Germany
+- Handle API authentication correctly
+- Parse XML responses properly
+- Fall back to synthetic data if needed
+- Work reliably in Google Colab
 
 ## Quick Start
 
@@ -108,7 +108,7 @@ if os.path.exists('src'):
             for item in os.listdir(f'src/{subdir}'):
                 print(f"  {item}")
 else:
-    print("\n❌ src directory not found!")
+    print("\n src directory not found!")
     print("Make sure you're in the energy_price_predictor directory")
     print("Run: %cd energy_price_predictor")
 
@@ -187,7 +187,7 @@ import numpy as np
 
 ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
 
-print("🔍 Getting real electricity price data...")
+print(" Getting real electricity price data...")
 
 def get_real_data():
     """Get real electricity price data from ENTSO-E API."""
@@ -201,10 +201,10 @@ def get_real_data():
     }
     
     # Try to get data over extended period for maximum records
-    print("🔄 Attempting to collect data over extended period...")
+    print(" Attempting to collect data over extended period...")
     
     for country_name, domain_code in countries.items():
-        print(f"\n🌍 Trying {country_name}...")
+        print(f"\n Trying {country_name}...")
         
         # Try to get data for the last 3 years (optimal for ML training)
         all_data = []
@@ -213,7 +213,7 @@ def get_real_data():
         for days_back in range(1, 1096):  # Try last 3 years for optimal ML training
             test_date = today - timedelta(days=days_back)
             date_str = test_date.strftime('%Y%m%d')
-            print(f"  📅 {days_back} days ago ({date_str})... [{days_back}/1095]")
+            print(f"   {days_back} days ago ({date_str})... [{days_back}/1095]")
             
             # API request parameters
             params = {
@@ -235,27 +235,27 @@ def get_real_data():
                     
                     # Check if it's an Acknowledgement document (no data)
                     if soup.find('Acknowledgement_MarketDocument'):
-                        print(f"    ❌ No data available")
+                        print(f"     No data available")
                         continue
                     
                     # Look for actual price data
                     time_series = soup.find_all('TimeSeries')
-                    print(f"    📊 Found {len(time_series)} time series")
+                    print(f"     Found {len(time_series)} time series")
                     
                     if time_series:
                         # Parse the data
                         day_data = parse_price_data(soup)
                         
                         if day_data is not None and len(day_data) > 0:
-                            print(f"    ✅ Got {len(day_data)} records")
+                            print(f"     Got {len(day_data)} records")
                             all_data.append(day_data)
                         else:
-                            print(f"    ❌ No price data found")
+                            print(f"     No price data found")
                     else:
-                        print(f"    ❌ No time series found")
+                        print(f"     No time series found")
                         
             except Exception as e:
-                print(f"    ❌ Error: {e}")
+                print(f"     Error: {e}")
                 continue
         
         # If we got data from multiple days, combine it
@@ -263,9 +263,9 @@ def get_real_data():
             combined_data = pd.concat(all_data, ignore_index=True)
             combined_data = combined_data.sort_values('datetime').reset_index(drop=True)
             
-            print(f"✅ SUCCESS! Combined {len(combined_data)} records from {len(all_data)} days")
-            print(f"💰 Price range: €{combined_data['price'].min():.2f} - €{combined_data['price'].max():.2f}/MWh")
-            print(f"📅 Date range: {combined_data['datetime'].min()} to {combined_data['datetime'].max()}")
+            print(f" SUCCESS! Combined {len(combined_data)} records from {len(all_data)} days")
+            print(f" Price range: €{combined_data['price'].min():.2f} - €{combined_data['price'].max():.2f}/MWh")
+            print(f" Date range: {combined_data['datetime'].min()} to {combined_data['datetime'].max()}")
             
             # Add time features
             combined_data['hour'] = combined_data['datetime'].dt.hour
@@ -273,10 +273,10 @@ def get_real_data():
             combined_data['month'] = combined_data['datetime'].dt.month
             combined_data['year'] = combined_data['datetime'].dt.year
             
-            print(f"✅ Real data from {country_name} ready!")
+            print(f" Real data from {country_name} ready!")
             return combined_data
     
-    print("\n🔧 No real data found. Using synthetic data...")
+    print("\n No real data found. Using synthetic data...")
     return generate_synthetic_data()
 
 def get_real_data_single_day():
@@ -302,11 +302,11 @@ def get_real_data_single_day():
     }
     
     for country_name, domain_code in countries.items():
-        print(f"\n🌍 Trying {country_name}...")
+        print(f"\n Trying {country_name}...")
         
         for period_name, test_date in date_ranges.items():
             date_str = test_date.strftime('%Y%m%d')
-            print(f"  📅 {period_name} ({date_str})...")
+            print(f"   {period_name} ({date_str})...")
             
             # API request parameters
             params = {
@@ -328,21 +328,21 @@ def get_real_data_single_day():
                     
                     # Check if it's an Acknowledgement document (no data)
                     if soup.find('Acknowledgement_MarketDocument'):
-                        print(f"    ❌ No data available")
+                        print(f"     No data available")
                         continue
                     
                     # Look for actual price data
                     time_series = soup.find_all('TimeSeries')
-                    print(f"    📊 Found {len(time_series)} time series")
+                    print(f"     Found {len(time_series)} time series")
                     
                     if time_series:
                         # Parse the data
                         data = parse_price_data(soup)
                         
                         if data is not None and len(data) > 0:
-                            print(f"    ✅ SUCCESS! Parsed {len(data)} price records")
-                            print(f"    💰 Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
-                            print(f"    📅 Date range: {data['datetime'].min()} to {data['datetime'].max()}")
+                            print(f"     SUCCESS! Parsed {len(data)} price records")
+                            print(f"     Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
+                            print(f"     Date range: {data['datetime'].min()} to {data['datetime'].max()}")
                             
                             # Add time features
                             data['hour'] = data['datetime'].dt.hour
@@ -350,18 +350,18 @@ def get_real_data_single_day():
                             data['month'] = data['datetime'].dt.month
                             data['year'] = data['datetime'].dt.year
                             
-                            print(f"✅ Real data from {country_name} ({period_name}) ready!")
+                            print(f" Real data from {country_name} ({period_name}) ready!")
                             return data
                         else:
-                            print(f"    ❌ No price data found")
+                            print(f"     No price data found")
                     else:
-                        print(f"    ❌ No time series found")
+                        print(f"     No time series found")
                         
             except Exception as e:
-                print(f"    ❌ Error: {e}")
+                print(f"     Error: {e}")
                 continue
     
-    print("\n🔧 No real data found. Using synthetic data...")
+    print("\n No real data found. Using synthetic data...")
     return generate_synthetic_data()
 
 def parse_price_data(soup):
@@ -402,7 +402,7 @@ def parse_price_data(soup):
 
 def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
     """Generate synthetic electricity price data."""
-    print("📊 Generating synthetic electricity price data...")
+    print(" Generating synthetic electricity price data...")
     
     dates = pd.date_range(start=start_date, periods=n_samples, freq='h')
     
@@ -430,19 +430,19 @@ def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
         'year': dates.year
     })
     
-    print(f"✅ Generated {len(data)} synthetic price records")
+    print(f" Generated {len(data)} synthetic price records")
     return data
 
 # Get the data (real or synthetic) - try multi-day approach first
-print("🔄 Trying to get data over multiple days for more records...")
+print(" Trying to get data over multiple days for more records...")
 data = get_real_data()
 
 # If we didn't get much data, try single day approach
 if len(data) < 100:
-    print(f"\n⚠️ Only got {len(data)} records. Trying single day approach...")
+    print(f"\n⚠ Only got {len(data)} records. Trying single day approach...")
     data = get_real_data_single_day()
 
-print(f"\n🎉 Data ready!")
+print(f"\n Data ready!")
 print(f"Records: {len(data)}")
 print(f"Date range: {data['datetime'].min()} to {data['datetime'].max()}")
 print(f"Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
@@ -458,7 +458,7 @@ from datetime import datetime, timedelta
 
 ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
 
-print("🔍 Step-by-step API debugging...")
+print(" Step-by-step API debugging...")
 
 # Step 1: Test with minimal parameters
 print("\n1. Testing minimal parameters...")
@@ -517,7 +517,7 @@ yesterday_params = {
 response = requests.get("https://web-api.tp.entsoe.eu/api", params=yesterday_params)
 print(f"Yesterday test: {response.status_code}")
 if response.status_code == 200:
-    print("✅ SUCCESS! API is working!")
+    print(" SUCCESS! API is working!")
     print("Response preview:", response.text[:200])
 else:
     print(f"Response: {response.text[:300]}")
@@ -537,14 +537,14 @@ if response.status_code != 200:
     response = requests.get("https://web-api.tp.entsoe.eu/api", params=de_params)
     print(f"Germany test: {response.status_code}")
     if response.status_code == 200:
-        print("✅ SUCCESS with Germany!")
+        print(" SUCCESS with Germany!")
         print("Response preview:", response.text[:200])
     else:
         print(f"Germany response: {response.text[:300]}")
-        print("\n🔧 API seems to have issues. Let's proceed with synthetic data for the demo.")
+        print("\n API seems to have issues. Let's proceed with synthetic data for the demo.")
         
         # Generate synthetic data as fallback
-        print("\n📊 Generating synthetic electricity price data...")
+        print("\n Generating synthetic electricity price data...")
         import pandas as pd
         import numpy as np
         
@@ -579,7 +579,7 @@ if response.status_code != 200:
             return data
         
         synthetic_data = generate_synthetic_data()
-        print(f"✅ Generated {len(synthetic_data)} synthetic price records")
+        print(f" Generated {len(synthetic_data)} synthetic price records")
         print("Sample data:")
         print(synthetic_data.head())
         print(f"Price range: €{synthetic_data['price'].min():.2f} - €{synthetic_data['price'].max():.2f}/MWh")
@@ -648,7 +648,7 @@ elif response.status_code == 400:
             print("Response preview:", response3.text[:200])
         else:
             print("Still having issues. Full response:", response3.text[:500])
-            print("\n🔧 Let's use synthetic data for now and continue with the demo...")
+            print("\n Let's use synthetic data for now and continue with the demo...")
             print("The API token is working, but there might be data availability issues.")
 else:
     print(f"Response: {response.status_code}")
@@ -730,11 +730,11 @@ except Exception as e:
 
 #### Option A: Real Data (Already Done in Block 3.2)
 ```python
-# ✅ Real data is already loaded from Block 3.2!
+#  Real data is already loaded from Block 3.2!
 # If you ran Block 3.2, you already have real electricity price data
 # The 'data' variable is ready to use
 
-print("✅ Using real data from Block 3.2")
+print(" Using real data from Block 3.2")
 print(f"Records: {len(data)}")
 print(f"Date range: {data['datetime'].min()} to {data['datetime'].max()}")
 print(f"Price range: €{data['price'].min():.2f} - €{data['price'].max():.2f}/MWh")
@@ -836,7 +836,7 @@ baseline_predictions = baseline_models.predict_all(X_test)
 baseline_results = baseline_models.evaluate_all(y_test, baseline_predictions)
 
 # Quick Fix for Infinity/Large Values
-print("🔧 Handling infinity and extreme values...")
+print(" Handling infinity and extreme values...")
 
 # Check for infinity values
 print(f"Infinity values in X_train: {np.isinf(X_train).sum().sum()}")
@@ -876,7 +876,7 @@ print(f"Final infinity check - X_train: {np.isinf(X_train).sum().sum()}")
 print(f"Final infinity check - X_test: {np.isinf(X_test).sum().sum()}")
 
 # Train ML models
-print("🚀 Training ML models...")
+print(" Training ML models...")
 ml_models = MLModels()
 ml_models.train_all(X_train, y_train, tune_hyperparameters=False)
 ml_predictions = ml_models.predict_all(X_test)

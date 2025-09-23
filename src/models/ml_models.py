@@ -7,6 +7,9 @@ linear regression, tree-based models, and ensemble methods.
 
 import pandas as pd
 import numpy as np
+import pickle
+import joblib
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 import logging
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
@@ -475,6 +478,97 @@ class MLModels:
         
         plt.tight_layout()
         plt.show()
+    
+    def save_model(self, model_name: str, filepath: str) -> None:
+        """
+        Save a trained model to disk.
+        
+        Args:
+            model_name: Name of the model to save
+            filepath: Path where to save the model
+        """
+        if model_name not in self.trained_models:
+            raise ValueError(f"Model '{model_name}' not found. Available models: {list(self.trained_models.keys())}")
+        
+        model_data = {
+            'model': self.trained_models[model_name],
+            'scaler': self.scaler,
+            'feature_importance': self.feature_importance.get(model_name),
+            'results': self.results.get(model_name) if hasattr(self.results, 'get') else None
+        }
+        
+        # Create directory if it doesn't exist
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save using joblib for better compatibility with scikit-learn
+        joblib.dump(model_data, filepath)
+        logger.info(f"Model '{model_name}' saved to {filepath}")
+    
+    def load_model(self, model_name: str, filepath: str) -> None:
+        """
+        Load a trained model from disk.
+        
+        Args:
+            model_name: Name to assign to the loaded model
+            filepath: Path where the model is saved
+        """
+        if not Path(filepath).exists():
+            raise FileNotFoundError(f"Model file not found: {filepath}")
+        
+        # Load model data
+        model_data = joblib.load(filepath)
+        
+        # Restore model and related data
+        self.trained_models[model_name] = model_data['model']
+        if model_data['scaler'] is not None:
+            self.scaler = model_data['scaler']
+        if model_data['feature_importance'] is not None:
+            self.feature_importance[model_name] = model_data['feature_importance']
+        if model_data['results'] is not None:
+            if not hasattr(self, 'results') or self.results is None:
+                self.results = {}
+            self.results[model_name] = model_data['results']
+        
+        logger.info(f"Model '{model_name}' loaded from {filepath}")
+    
+    def save_all_models(self, directory: str) -> None:
+        """
+        Save all trained models to a directory.
+        
+        Args:
+            directory: Directory where to save the models
+        """
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        
+        for model_name in self.trained_models.keys():
+            filepath = directory / f"{model_name}.pkl"
+            self.save_model(model_name, str(filepath))
+        
+        logger.info(f"All models saved to {directory}")
+    
+    def load_all_models(self, directory: str) -> None:
+        """
+        Load all models from a directory.
+        
+        Args:
+            directory: Directory where the models are saved
+        """
+        directory = Path(directory)
+        
+        if not directory.exists():
+            raise FileNotFoundError(f"Directory not found: {directory}")
+        
+        model_files = list(directory.glob("*.pkl"))
+        
+        if not model_files:
+            raise FileNotFoundError(f"No model files found in {directory}")
+        
+        for model_file in model_files:
+            model_name = model_file.stem
+            self.load_model(model_name, str(model_file))
+        
+        logger.info(f"Loaded {len(model_files)} models from {directory}")
 
 
 def main():
