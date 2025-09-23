@@ -853,9 +853,27 @@ X_test = X_test.fillna(X_train.median())  # Use training median for test data
 print(f"After cleaning - Infinity values in X_train: {np.isinf(X_train).sum().sum()}")
 print(f"After cleaning - Infinity values in X_test: {np.isinf(X_test).sum().sum()}")
 
+# Additional NaN cleaning - some models still see NaN values
+print(f"NaN values in X_train after median fill: {X_train.isnull().sum().sum()}")
+print(f"NaN values in X_test after median fill: {X_test.isnull().sum().sum()}")
+
+# Final cleanup - forward fill, then backward fill, then zero fill
+X_train = X_train.ffill().bfill().fillna(0)
+X_test = X_test.ffill().bfill().fillna(0)
+
+print(f"Final NaN values in X_train: {X_train.isnull().sum().sum()}")
+print(f"Final NaN values in X_test: {X_test.isnull().sum().sum()}")
+
 # Check for extremely large values
 print(f"Max value in X_train: {X_train.max().max():.2f}")
 print(f"Min value in X_train: {X_train.min().min():.2f}")
+
+# Ensure no infinity values remain
+X_train = X_train.replace([np.inf, -np.inf], 0)
+X_test = X_test.replace([np.inf, -np.inf], 0)
+
+print(f"Final infinity check - X_train: {np.isinf(X_train).sum().sum()}")
+print(f"Final infinity check - X_test: {np.isinf(X_test).sum().sum()}")
 
 # Train ML models
 print("🚀 Training ML models...")
