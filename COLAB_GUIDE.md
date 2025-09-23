@@ -139,8 +139,8 @@ def patch_downloader():
             'documentType': document_type,
             'in_Domain': f'10Y{country}----------',
             'out_Domain': f'10Y{country}----------',
-            'periodStart': f'{start_date}T00:00Z',
-            'periodEnd': f'{end_date}T23:59Z',
+            'periodStart': f'{start_date.replace("-", "")}0000',
+            'periodEnd': f'{end_date.replace("-", "")}2359',
             'securityToken': self.api_token  # This is the key fix!
         }
         
@@ -167,7 +167,38 @@ def patch_downloader():
 patch_downloader()
 ```
 
-### 3.2 Test Your API Token
+### 3.2 Quick Fix for Date Format Issue
+```python
+# Quick fix for the 400 error - ENTSO-E API expects specific date format
+print("Testing with correct date format...")
+
+ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+
+# Test with correct date format (YYYYMMDDHHMM)
+test_params = {
+    'documentType': 'A44',
+    'in_Domain': '10YIT----------',
+    'out_Domain': '10YIT----------',
+    'periodStart': '202401010000',  # 2024-01-01 00:00
+    'periodEnd': '202401012359',    # 2024-01-01 23:59
+    'securityToken': ENTSOE_API_TOKEN
+}
+
+response = requests.get("https://web-api.tp.entsoe.eu/api", params=test_params)
+print(f"API Response Status: {response.status_code}")
+
+if response.status_code == 200:
+    print("✓ API is working with correct date format!")
+    print("Response preview:", response.text[:200])
+elif response.status_code == 400:
+    print("Still getting 400 error. Let's try a different approach...")
+    print("Response:", response.text[:500])
+else:
+    print(f"Response: {response.status_code}")
+    print("Response text:", response.text[:200])
+```
+
+### 3.3 Test Your API Token
 ```python
 # Test your ENTSO-E API token
 ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
@@ -185,8 +216,8 @@ try:
         'documentType': 'A44',
         'in_Domain': '10YIT----------',
         'out_Domain': '10YIT----------',
-        'periodStart': '2024-01-01T00:00Z',
-        'periodEnd': '2024-01-01T23:59Z',
+        'periodStart': '202401010000',
+        'periodEnd': '202401012359',
         'securityToken': ENTSOE_API_TOKEN
     }
     
