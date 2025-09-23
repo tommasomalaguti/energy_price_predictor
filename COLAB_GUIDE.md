@@ -275,31 +275,88 @@ if response.status_code == 200:
             print("⚠️  Received Acknowledgement document - this means no data available for this period")
             print("Let's try a different date range...")
             
-            # Try a few days ago instead
-            few_days_ago = today - timedelta(days=3)
-            few_days_str = few_days_ago.strftime('%Y%m%d')
+            # Try different date ranges - ENTSO-E data might not be available for very recent dates
+            print("Trying different date ranges...")
+            
+            # Try 1 week ago
+            week_ago = today - timedelta(days=7)
+            week_ago_str = week_ago.strftime('%Y%m%d')
             
             retry_params = {
                 'documentType': 'A44',
                 'in_Domain': '10Y1001A1001A63L',
                 'out_Domain': '10Y1001A1001A63L',
-                'periodStart': f'{few_days_str}0000',
-                'periodEnd': f'{few_days_str}2359',
+                'periodStart': f'{week_ago_str}0000',
+                'periodEnd': f'{week_ago_str}2359',
                 'securityToken': ENTSOE_API_TOKEN
             }
             
-            print(f"Retrying with {few_days_str}...")
+            print(f"Trying 1 week ago: {week_ago_str}...")
             retry_response = requests.get("https://web-api.tp.entsoe.eu/api", params=retry_params)
-            print(f"Retry response: {retry_response.status_code}")
+            print(f"1 week ago response: {retry_response.status_code}")
             
             if retry_response.status_code == 200:
                 soup = BeautifulSoup(retry_response.text, 'xml')
                 if not soup.find('Acknowledgement_MarketDocument'):
-                    print("✅ Got actual data on retry!")
+                    print("✅ Got actual data from 1 week ago!")
                     response = retry_response
                 else:
-                    print("Still getting Acknowledgement. Let's try a different approach...")
-                    raise Exception("No data available")
+                    print("Still getting Acknowledgement. Trying 2 weeks ago...")
+                    
+                    # Try 2 weeks ago
+                    two_weeks_ago = today - timedelta(days=14)
+                    two_weeks_str = two_weeks_ago.strftime('%Y%m%d')
+                    
+                    retry_params = {
+                        'documentType': 'A44',
+                        'in_Domain': '10Y1001A1001A63L',
+                        'out_Domain': '10Y1001A1001A63L',
+                        'periodStart': f'{two_weeks_str}0000',
+                        'periodEnd': f'{two_weeks_str}2359',
+                        'securityToken': ENTSOE_API_TOKEN
+                    }
+                    
+                    print(f"Trying 2 weeks ago: {two_weeks_str}...")
+                    retry_response = requests.get("https://web-api.tp.entsoe.eu/api", params=retry_params)
+                    print(f"2 weeks ago response: {retry_response.status_code}")
+                    
+                    if retry_response.status_code == 200:
+                        soup = BeautifulSoup(retry_response.text, 'xml')
+                        if not soup.find('Acknowledgement_MarketDocument'):
+                            print("✅ Got actual data from 2 weeks ago!")
+                            response = retry_response
+                        else:
+                            print("Still getting Acknowledgement. Trying 1 month ago...")
+                            
+                            # Try 1 month ago
+                            month_ago = today - timedelta(days=30)
+                            month_ago_str = month_ago.strftime('%Y%m%d')
+                            
+                            retry_params = {
+                                'documentType': 'A44',
+                                'in_Domain': '10Y1001A1001A63L',
+                                'out_Domain': '10Y1001A1001A63L',
+                                'periodStart': f'{month_ago_str}0000',
+                                'periodEnd': f'{month_ago_str}2359',
+                                'securityToken': ENTSOE_API_TOKEN
+                            }
+                            
+                            print(f"Trying 1 month ago: {month_ago_str}...")
+                            retry_response = requests.get("https://web-api.tp.entsoe.eu/api", params=retry_params)
+                            print(f"1 month ago response: {retry_response.status_code}")
+                            
+                            if retry_response.status_code == 200:
+                                soup = BeautifulSoup(retry_response.text, 'xml')
+                                if not soup.find('Acknowledgement_MarketDocument'):
+                                    print("✅ Got actual data from 1 month ago!")
+                                    response = retry_response
+                                else:
+                                    print("No data available for any recent period. Using synthetic data.")
+                                    raise Exception("No data available")
+                            else:
+                                raise Exception("Retry failed")
+                    else:
+                        raise Exception("Retry failed")
             else:
                 raise Exception("Retry failed")
         
