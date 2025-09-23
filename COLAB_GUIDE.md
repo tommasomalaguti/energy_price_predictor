@@ -206,14 +206,14 @@ def get_real_data():
     for country_name, domain_code in countries.items():
         print(f"\n🌍 Trying {country_name}...")
         
-        # Try to get data for the last 30 days (more reasonable range)
+        # Try to get data for the last 3 years (optimal for ML training)
         all_data = []
         today = datetime.now()
         
-        for days_back in range(1, 31):  # Try last 30 days for maximum data
+        for days_back in range(1, 1096):  # Try last 3 years for optimal ML training
             test_date = today - timedelta(days=days_back)
             date_str = test_date.strftime('%Y%m%d')
-            print(f"  📅 {days_back} days ago ({date_str})... [{days_back}/30]")
+            print(f"  📅 {days_back} days ago ({date_str})... [{days_back}/1095]")
             
             # API request parameters
             params = {
