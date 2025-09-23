@@ -167,7 +167,142 @@ def patch_downloader():
 patch_downloader()
 ```
 
-### 3.2 Quick Fix for Date Format Issue
+### 3.2 Simple API Test - Let's Debug This Step by Step
+```python
+# Let's debug the ENTSO-E API step by step
+import requests
+from datetime import datetime, timedelta
+
+ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+
+print("🔍 Step-by-step API debugging...")
+
+# Step 1: Test with minimal parameters
+print("\n1. Testing minimal parameters...")
+minimal_params = {
+    'documentType': 'A44',
+    'securityToken': ENTSOE_API_TOKEN
+}
+
+response = requests.get("https://web-api.tp.entsoe.eu/api", params=minimal_params)
+print(f"Minimal test: {response.status_code}")
+print(f"Response: {response.text[:300]}")
+
+# Step 2: Add domain parameters
+print("\n2. Adding domain parameters...")
+domain_params = {
+    'documentType': 'A44',
+    'in_Domain': '10YIT----------',
+    'out_Domain': '10YIT----------',
+    'securityToken': ENTSOE_API_TOKEN
+}
+
+response = requests.get("https://web-api.tp.entsoe.eu/api", params=domain_params)
+print(f"Domain test: {response.status_code}")
+print(f"Response: {response.text[:300]}")
+
+# Step 3: Add time parameters with today's date
+print("\n3. Adding time parameters (today)...")
+today = datetime.now()
+today_str = today.strftime('%Y%m%d')
+today_params = {
+    'documentType': 'A44',
+    'in_Domain': '10YIT----------',
+    'out_Domain': '10YIT----------',
+    'periodStart': f'{today_str}0000',
+    'periodEnd': f'{today_str}2359',
+    'securityToken': ENTSOE_API_TOKEN
+}
+
+response = requests.get("https://web-api.tp.entsoe.eu/api", params=today_params)
+print(f"Today test: {response.status_code}")
+print(f"Response: {response.text[:300]}")
+
+# Step 4: Try yesterday (more likely to have data)
+print("\n4. Trying yesterday...")
+yesterday = today - timedelta(days=1)
+yesterday_str = yesterday.strftime('%Y%m%d')
+yesterday_params = {
+    'documentType': 'A44',
+    'in_Domain': '10YIT----------',
+    'out_Domain': '10YIT----------',
+    'periodStart': f'{yesterday_str}0000',
+    'periodEnd': f'{yesterday_str}2359',
+    'securityToken': ENTSOE_API_TOKEN
+}
+
+response = requests.get("https://web-api.tp.entsoe.eu/api", params=yesterday_params)
+print(f"Yesterday test: {response.status_code}")
+if response.status_code == 200:
+    print("✅ SUCCESS! API is working!")
+    print("Response preview:", response.text[:200])
+else:
+    print(f"Response: {response.text[:300]}")
+
+# Step 5: If still failing, try Germany
+if response.status_code != 200:
+    print("\n5. Trying Germany instead of Italy...")
+    de_params = {
+        'documentType': 'A44',
+        'in_Domain': '10YDE----------',
+        'out_Domain': '10YDE----------',
+        'periodStart': f'{yesterday_str}0000',
+        'periodEnd': f'{yesterday_str}2359',
+        'securityToken': ENTSOE_API_TOKEN
+    }
+    
+    response = requests.get("https://web-api.tp.entsoe.eu/api", params=de_params)
+    print(f"Germany test: {response.status_code}")
+    if response.status_code == 200:
+        print("✅ SUCCESS with Germany!")
+        print("Response preview:", response.text[:200])
+    else:
+        print(f"Germany response: {response.text[:300]}")
+        print("\n🔧 API seems to have issues. Let's proceed with synthetic data for the demo.")
+        
+        # Generate synthetic data as fallback
+        print("\n📊 Generating synthetic electricity price data...")
+        import pandas as pd
+        import numpy as np
+        
+        def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
+            """Generate synthetic electricity price data for demonstration."""
+            dates = pd.date_range(start=start_date, periods=n_samples, freq='H')
+            
+            # Base price with seasonal patterns
+            base_price = 50 + 20 * np.sin(2 * np.pi * np.arange(n_samples) / (24 * 365))  # Annual seasonality
+            base_price += 10 * np.sin(2 * np.pi * np.arange(n_samples) / 24)  # Daily seasonality
+            
+            # Add some realistic volatility
+            noise = np.random.normal(0, 15, n_samples)
+            prices = base_price + noise
+            
+            # Add some extreme spikes (realistic for electricity markets)
+            spike_indices = np.random.choice(n_samples, size=int(0.01 * n_samples), replace=False)
+            prices[spike_indices] *= np.random.uniform(2, 5, len(spike_indices))
+            
+            # Ensure prices are positive
+            prices = np.maximum(prices, 5)
+            
+            data = pd.DataFrame({
+                'datetime': dates,
+                'price': prices,
+                'hour': dates.hour,
+                'day_of_week': dates.dayofweek,
+                'month': dates.month,
+                'year': dates.year
+            })
+            
+            return data
+        
+        synthetic_data = generate_synthetic_data()
+        print(f"✅ Generated {len(synthetic_data)} synthetic price records")
+        print("Sample data:")
+        print(synthetic_data.head())
+        print(f"Price range: €{synthetic_data['price'].min():.2f} - €{synthetic_data['price'].max():.2f}/MWh")
+```
+
+### 3.2.1 Quick Fix for Date Format Issue
 ```python
 # Quick fix for the 400 error - ENTSO-E API expects specific date format
 print("Testing with correct date format...")
