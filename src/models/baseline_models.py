@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Union
 import logging
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator, RegressorMixin
 
 # Configure logging
@@ -244,6 +244,10 @@ class BaselineModels:
         Returns:
             Dictionary of trained models
         """
+        # Validate input data
+        if len(X_train) == 0 or len(y_train) == 0:
+            raise ValueError("Training data cannot be empty")
+        
         logger.info("Training baseline models...")
         
         for name, model in self.models.items():
@@ -267,6 +271,9 @@ class BaselineModels:
         Returns:
             Dictionary of predictions
         """
+        if not self.trained_models:
+            raise ValueError("No models have been trained. Call train_all() first.")
+        
         predictions = {}
         
         for name, model in self.trained_models.items():
@@ -302,6 +309,7 @@ class BaselineModels:
             rmse = np.sqrt(mse)
             mae = mean_absolute_error(y_test, pred)
             mape = np.mean(np.abs((y_test - pred) / y_test)) * 100
+            r2 = r2_score(y_test, pred)
             
             # Directional accuracy
             if len(pred) > 1:
@@ -317,6 +325,7 @@ class BaselineModels:
                 'rmse': rmse,
                 'mae': mae,
                 'mape': mape,
+                'r2': r2,
                 'directional_accuracy': directional_accuracy
             })
         

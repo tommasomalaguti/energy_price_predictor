@@ -147,8 +147,8 @@ class TestBaselineModels:
         assert 'rmse' in results.columns
         assert 'mae' in results.columns
         assert 'r2' in results.columns
-        assert results['rmse'] >= 0
-        assert results['mae'] >= 0
+        assert results['rmse'].min() >= 0
+        assert results['mae'].min() >= 0
     
     def test_evaluate_all_models(self, sample_train_test_data):
         """Test evaluation of all baseline models."""

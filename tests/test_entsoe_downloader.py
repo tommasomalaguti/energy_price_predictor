@@ -65,10 +65,11 @@ class TestENTSOEDownloader:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = mock_entsoe_response
+        mock_response.headers = {'content-type': 'application/xml'}
         mock_get.return_value = mock_response
         
         downloader = ENTSOEDownloader(api_token="test_token")
-        result = downloader._download_chunk("DE", "20230101", "20230101", "day_ahead")
+        result = downloader._download_chunk("DE", "2023-01-01", "2023-01-01", "day_ahead")
         
         assert isinstance(result, pd.DataFrame)
         assert len(result) > 0
@@ -82,10 +83,11 @@ class TestENTSOEDownloader:
         mock_response = Mock()
         mock_response.status_code = 401
         mock_response.text = "Unauthorized"
+        mock_response.headers = {'content-type': 'application/xml'}
         mock_get.return_value = mock_response
         
         downloader = ENTSOEDownloader(api_token="invalid_token")
-        result = downloader._download_chunk("DE", "20230101", "20230101", "day_ahead")
+        result = downloader._download_chunk("DE", "2023-01-01", "2023-01-01", "day_ahead")
         
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
@@ -106,7 +108,7 @@ class TestENTSOEDownloader:
         mock_get.return_value = mock_response
         
         downloader = ENTSOEDownloader(api_token="test_token")
-        result = downloader._download_chunk("DE", "20230101", "20230101", "day_ahead")
+        result = downloader._download_chunk("DE", "2023-01-01", "2023-01-01", "day_ahead")
         
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
@@ -219,7 +221,7 @@ class TestENTSOEDownloader:
         mock_get.side_effect = Exception("Network error")
         
         downloader = ENTSOEDownloader(api_token="test_token")
-        result = downloader._download_chunk("DE", "20230101", "20230101", "day_ahead")
+        result = downloader._download_chunk("DE", "2023-01-01", "2023-01-01", "day_ahead")
         
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
