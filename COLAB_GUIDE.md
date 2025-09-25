@@ -185,7 +185,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 
-ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+ENTSOE_API_TOKEN = "55db65ac-e776-4b95-8aa2-1b143628b3b0"
 
 print(" Getting real electricity price data...")
 
@@ -425,7 +425,7 @@ print(data.head())
 import requests
 from datetime import datetime, timedelta
 
-ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+ENTSOE_API_TOKEN = "55db65ac-e776-4b95-8aa2-1b143628b3b0"
 
 print(" Step-by-step API debugging...")
 
@@ -519,7 +519,7 @@ if response.status_code != 200:
 # Quick fix for the 400 error - ENTSO-E API expects specific date format
 print("Testing with correct date format...")
 
-ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+ENTSOE_API_TOKEN = "55db65ac-e776-4b95-8aa2-1b143628b3b0"
 
 # Test with correct date format (YYYYMMDDHHMM)
 test_params = {
@@ -587,7 +587,7 @@ else:
 ### 3.3 Test Your API Token
 ```python
 # Test your ENTSO-E API token
-ENTSOE_API_TOKEN = "2c8cd8e0-0a84-4f67-90ba-b79d07ab2667"
+ENTSOE_API_TOKEN = "55db65ac-e776-4b95-8aa2-1b143628b3b0"
 
 print("Testing ENTSO-E API token...")
 downloader = ENTSOEDownloader(api_token=ENTSOE_API_TOKEN)
