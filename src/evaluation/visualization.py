@@ -526,54 +526,17 @@ class ModelVisualization:
 
 
 def main():
-    """Example usage of visualization tools."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create synthetic electricity price data
-    t = np.arange(n_samples)
-    price = 50 + 10 * np.sin(2 * np.pi * t / 24) + np.random.normal(0, 2, n_samples)
-    
-    # Create true and predicted values
-    y_true = pd.Series(price, name='price')
-    predictions = {
-        'Model A': price + np.random.normal(0, 1, n_samples),
-        'Model B': price + np.random.normal(0, 1.5, n_samples),
-        'Model C': price + np.random.normal(0, 0.8, n_samples)
-    }
-    
-    # Create results DataFrame
-    results_data = []
-    for model_name, pred in predictions.items():
-        mae = np.mean(np.abs(y_true - pred))
-        rmse = np.sqrt(np.mean((y_true - pred) ** 2))
-        mape = np.mean(np.abs((y_true - pred) / y_true)) * 100
-        r2 = 1 - np.sum((y_true - pred) ** 2) / np.sum((y_true - y_true.mean()) ** 2)
-        
-        results_data.append({
-            'mae': mae,
-            'rmse': rmse,
-            'mape': mape,
-            'r2': r2
-        })
-    
-    results_df = pd.DataFrame(results_data, index=list(predictions.keys()))
-    
-    # Create visualizations
-    viz = ModelVisualization()
-    
-    # Plot predictions vs actual
-    viz.plot_predictions_vs_actual(y_true, predictions)
-    
-    # Plot error distribution
-    viz.plot_error_distribution(y_true, predictions)
-    
-    # Plot metrics comparison
-    viz.plot_metrics_comparison(results_df)
-    
-    # Create dashboard
-    viz.create_dashboard(y_true, predictions, results_df)
+    """Example usage of visualization tools with real data."""
+    print("Model Visualization example requires real electricity price data.")
+    print("Please use the ENTSO-E downloader to get real data first.")
+    print("Example usage:")
+    print("1. Download real data using ENTSOEDownloader")
+    print("2. Train models and get predictions")
+    print("3. Use ModelVisualization to create plots:")
+    print("   - plot_predictions_vs_actual()")
+    print("   - plot_error_distribution()")
+    print("   - plot_metrics_comparison()")
+    print("   - create_dashboard()")
 
 
 if __name__ == "__main__":

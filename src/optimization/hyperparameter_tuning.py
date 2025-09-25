@@ -555,41 +555,17 @@ class HyperparameterTuner:
 
 
 def main():
-    """Example usage of hyperparameter tuning."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create features
-    X = pd.DataFrame({
-        'feature1': np.random.randn(n_samples),
-        'feature2': np.random.randn(n_samples),
-        'feature3': np.random.randn(n_samples),
-        'feature4': np.random.randn(n_samples),
-        'feature5': np.random.randn(n_samples)
-    })
-    
-    # Create target with some noise
-    y = (2 * X['feature1'] + 3 * X['feature2'] + 
-         1.5 * X['feature3'] + 0.5 * X['feature4'] + 
-         np.random.randn(n_samples) * 0.5)
-    
-    # Split data
-    split_idx = int(0.8 * n_samples)
-    X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-    
-    # Initialize tuner
-    tuner = HyperparameterTuner(n_trials=20, cv_folds=3)
-    
-    # Optimize Random Forest
-    print("Optimizing Random Forest...")
-    best_params = tuner.optimize_random_forest(X_train, y_train)
-    print(f"Best parameters: {best_params}")
-    print(f"Best score: {tuner.best_score:.4f}")
-    
-    # Plot optimization history
-    tuner.plot_optimization_history()
+    """Example usage of hyperparameter tuning with real data."""
+    print("Hyperparameter Tuning example requires real electricity price data.")
+    print("Please use the ENTSO-E downloader to get real data first.")
+    print("Example usage:")
+    print("1. Download real data using ENTSOEDownloader")
+    print("2. Preprocess data using DataPreprocessor") 
+    print("3. Use HyperparameterTuner to optimize models:")
+    print("   - optimize_random_forest()")
+    print("   - optimize_xgboost()")
+    print("   - optimize_neural_network()")
+    print("4. Use plot_optimization_history() to visualize results")
 
 
 if __name__ == "__main__":

@@ -114,17 +114,21 @@ class DataPreprocessor:
         df = df[~df.index.duplicated(keep='first')]
         logger.info(f"Removed {initial_count - len(df)} duplicate records")
         
+        # Handle missing values first
+        df = self._handle_missing_values(df, 'price')
+        
         # Handle outliers
         df = self._remove_outliers(df, 'price')
         
         # Validate price range
         df = self._validate_price_range(df)
         
-        # Handle missing values
-        df = self._handle_missing_values(df, 'price')
-        
         # Ensure regular time index
         df = self._ensure_regular_time_index(df)
+        
+        # Check minimum data requirement
+        if len(df) < 10:
+            logger.warning(f"Very few records remaining ({len(df)}). Consider using sample data or checking data quality.")
         
         self.price_data = df
         logger.info(f"Price data cleaned: {len(df)} records remaining")
@@ -167,15 +171,21 @@ class DataPreprocessor:
         return df
     
     def _remove_outliers(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
-        """Remove outliers using Z-score method."""
+        """Remove outliers using Z-score method with more lenient threshold."""
         if column not in df.columns:
             return df
         
+        # Use more lenient outlier detection for small datasets
+        if len(df) < 100:
+            threshold = 5.0  # More lenient for small datasets
+        else:
+            threshold = self.config['outlier_threshold']
+        
         z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
-        outliers = z_scores > self.config['outlier_threshold']
+        outliers = z_scores > threshold
         
         if outliers.sum() > 0:
-            logger.info(f"Removing {outliers.sum()} outliers from {column}")
+            logger.info(f"Removing {outliers.sum()} outliers from {column} (threshold: {threshold})")
             df = df[~outliers]
         
         return df
@@ -209,9 +219,9 @@ class DataPreprocessor:
             if self.config['interpolation_method'] == 'linear':
                 df[column] = df[column].interpolate(method='linear')
             elif self.config['interpolation_method'] == 'forward':
-                df[column] = df[column].fillna(method='ffill')
+                df[column] = df[column].ffill()
             elif self.config['interpolation_method'] == 'backward':
-                df[column] = df[column].fillna(method='bfill')
+                df[column] = df[column].bfill()
             else:
                 df[column] = df[column].fillna(df[column].mean())
         
@@ -223,9 +233,9 @@ class DataPreprocessor:
             return df
         
         # Create regular hourly index
-        start_time = df.index.min().floor('H')
-        end_time = df.index.max().ceil('H')
-        regular_index = pd.date_range(start_time, end_time, freq='H', inclusive='left')
+        start_time = pd.Timestamp(df.index.min()).floor('h')
+        end_time = pd.Timestamp(df.index.max()).ceil('h')
+        regular_index = pd.date_range(start_time, end_time, freq='h', inclusive='left')
         
         # Reindex and interpolate missing values
         df = df.reindex(regular_index)
@@ -258,6 +268,8 @@ class DataPreprocessor:
         features_df = price_df.copy()
         
         # Time-based features
+        if not isinstance(features_df.index, pd.DatetimeIndex):
+            raise ValueError("DataFrame must have a DatetimeIndex for feature engineering")
         features_df = self._add_time_features(features_df)
         
         # Price-based features
@@ -275,6 +287,12 @@ class DataPreprocessor:
         
         # Rolling statistics
         features_df = self._add_rolling_features(features_df)
+        
+        # Fourier features for seasonality
+        features_df = self._add_fourier_features(features_df)
+        
+        # Advanced time features
+        features_df = self._add_advanced_time_features(features_df)
         
         self.processed_data = features_df
         logger.info(f"Feature engineering complete: {len(features_df.columns)} features")
@@ -370,7 +388,7 @@ class DataPreprocessor:
         return df
     
     def _add_lag_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Add lag features."""
+        """Add lag features with interactions."""
         if 'price' not in df.columns:
             return df
         
@@ -383,20 +401,102 @@ class DataPreprocessor:
             for lag in [1, 24, 168]:
                 df[f'temp_lag_{lag}'] = df['temperature'].shift(lag)
         
+        # Lag interactions (price * hour, price * day_of_week)
+        for lag in [1, 24]:
+            if f'price_lag_{lag}' in df.columns:
+                df[f'price_hour_interaction_lag_{lag}'] = df[f'price_lag_{lag}'] * df['hour']
+                df[f'price_day_interaction_lag_{lag}'] = df[f'price_lag_{lag}'] * df['day_of_week']
+        
         return df
     
     def _add_rolling_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Add rolling statistical features."""
+        """Add advanced rolling statistical features."""
         if 'price' not in df.columns:
             return df
         
-        # Rolling means
+        # Rolling means and standard deviations
         for window in [3, 6, 12, 24, 48, 168]:
             df[f'price_mean_{window}h'] = df['price'].rolling(window=window, min_periods=1).mean()
             df[f'price_std_{window}h'] = df['price'].rolling(window=window, min_periods=1).std()
+            df[f'price_median_{window}h'] = df['price'].rolling(window=window, min_periods=1).median()
+            df[f'price_skew_{window}h'] = df['price'].rolling(window=window, min_periods=1).skew()
+            df[f'price_kurt_{window}h'] = df['price'].rolling(window=window, min_periods=1).kurt()
+        
+        # Rolling quantiles
+        for window in [24, 168]:
+            for q in [0.1, 0.25, 0.75, 0.9]:
+                df[f'price_q{int(q*100)}_{window}h'] = df['price'].rolling(window=window, min_periods=1).quantile(q)
         
         # Rolling correlations with time features
         df['price_hour_corr'] = df['price'].rolling(window=168, min_periods=24).corr(df['hour'])
+        df['price_day_corr'] = df['price'].rolling(window=168, min_periods=24).corr(df['day_of_week'])
+        
+        # Rolling autocorrelation
+        for lag in [1, 24, 168]:
+            df[f'price_autocorr_lag_{lag}'] = df['price'].rolling(window=168, min_periods=24).apply(
+                lambda x: x.autocorr(lag=lag) if len(x) > lag else np.nan
+            )
+        
+        # Rolling volatility (GARCH-like)
+        df['price_volatility_24h'] = df['price'].rolling(window=24, min_periods=1).std()
+        df['price_volatility_168h'] = df['price'].rolling(window=168, min_periods=1).std()
+        
+        # Rolling momentum and mean reversion
+        df['price_momentum_24h'] = df['price'] - df['price'].shift(24)
+        df['price_mean_reversion_24h'] = df['price_mean_24h'] - df['price']
+        
+        return df
+    
+    def _add_fourier_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add Fourier terms for capturing seasonal patterns."""
+        # Daily seasonality (24-hour cycle)
+        for k in range(1, 4):  # First 3 harmonics
+            df[f'fourier_daily_sin_{k}'] = np.sin(2 * np.pi * k * df['hour'] / 24)
+            df[f'fourier_daily_cos_{k}'] = np.cos(2 * np.pi * k * df['hour'] / 24)
+        
+        # Weekly seasonality (168-hour cycle)
+        hour_of_week = df['hour'] + 24 * df['day_of_week']
+        for k in range(1, 3):  # First 2 harmonics
+            df[f'fourier_weekly_sin_{k}'] = np.sin(2 * np.pi * k * hour_of_week / 168)
+            df[f'fourier_weekly_cos_{k}'] = np.cos(2 * np.pi * k * hour_of_week / 168)
+        
+        # Annual seasonality (8760-hour cycle)
+        hour_of_year = df.index.dayofyear * 24 + df['hour']
+        for k in range(1, 2):  # First harmonic only
+            df[f'fourier_annual_sin_{k}'] = np.sin(2 * np.pi * k * hour_of_year / 8760)
+            df[f'fourier_annual_cos_{k}'] = np.cos(2 * np.pi * k * hour_of_year / 8760)
+        
+        return df
+    
+    def _add_advanced_time_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add advanced time-based features."""
+        # Time since last peak/valley
+        price_rolling_max = df['price'].rolling(window=24, min_periods=1).max()
+        price_rolling_min = df['price'].rolling(window=24, min_periods=1).min()
+        
+        df['time_since_peak'] = 0
+        df['time_since_valley'] = 0
+        
+        for i in range(1, len(df)):
+            if df['price'].iloc[i] == price_rolling_max.iloc[i]:
+                df['time_since_peak'].iloc[i] = 0
+            else:
+                df['time_since_peak'].iloc[i] = df['time_since_peak'].iloc[i-1] + 1
+                
+            if df['price'].iloc[i] == price_rolling_min.iloc[i]:
+                df['time_since_valley'].iloc[i] = 0
+            else:
+                df['time_since_valley'].iloc[i] = df['time_since_valley'].iloc[i-1] + 1
+        
+        # Price position within daily range
+        daily_max = df['price'].groupby(df.index.date).transform('max')
+        daily_min = df['price'].groupby(df.index.date).transform('min')
+        df['price_position_daily'] = (df['price'] - daily_min) / (daily_max - daily_min + 1e-8)
+        
+        # Price position within weekly range
+        weekly_max = df['price'].groupby(df.index.isocalendar().week).transform('max')
+        weekly_min = df['price'].groupby(df.index.isocalendar().week).transform('min')
+        df['price_position_weekly'] = (df['price'] - weekly_min) / (weekly_max - weekly_min + 1e-8)
         
         return df
     

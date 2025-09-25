@@ -69,8 +69,9 @@ def main():
         
     except Exception as e:
         print(f"ERROR downloading data: {e}")
-        print("Falling back to synthetic data...")
-        return use_synthetic_data()
+        print("Please check your API token and network connection.")
+        print("This example requires real data from ENTSO-E API.")
+        return
     
     # 2. Preprocess real data
     print("\n2. Preprocessing real electricity price data...")
@@ -214,14 +215,6 @@ def main():
         print("Model accuracy may need improvement for operational planning")
 
 
-def use_synthetic_data():
-    """Fallback to synthetic data if real data download fails."""
-    print("\n=== FALLING BACK TO SYNTHETIC DATA ===")
-    print("Running the synthetic data workflow...")
-    
-    # Import and run the synthetic workflow
-    from example_workflow import main as synthetic_main
-    synthetic_main()
 
 
 if __name__ == "__main__":

@@ -43,6 +43,14 @@ class EvaluationMetrics:
         Returns:
             Dictionary of calculated metrics
         """
+        # Validate inputs
+        if len(y_true) == 0:
+            raise ValueError("y_true cannot be empty")
+        if len(y_pred) == 0:
+            raise ValueError("y_pred cannot be empty")
+        if len(y_true) != len(y_pred):
+            raise ValueError(f"Length mismatch: y_true has {len(y_true)} elements, y_pred has {len(y_pred)} elements")
+        
         metrics = {}
         
         # Basic statistical metrics
@@ -74,8 +82,14 @@ class EvaluationMetrics:
         mse = mean_squared_error(y_true, y_pred)
         rmse = np.sqrt(mse)
         
-        # Mean Absolute Percentage Error
-        mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+        # Mean Absolute Percentage Error (handle zeros by using symmetric MAPE)
+        # For zero values, use symmetric MAPE to avoid division by zero
+        mask = y_true != 0
+        if np.any(mask):
+            mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+        else:
+            # If all values are zero, use symmetric MAPE
+            mape = np.mean(2 * np.abs(y_true - y_pred) / (np.abs(y_true) + np.abs(y_pred))) * 100
         
         # Symmetric Mean Absolute Percentage Error
         smape = np.mean(2 * np.abs(y_true - y_pred) / (np.abs(y_true) + np.abs(y_pred))) * 100
@@ -113,9 +127,13 @@ class EvaluationMetrics:
         y_diff = np.diff(y_true.values)
         pred_diff = np.diff(y_pred)
         
-        # Correct direction predictions
+        # Correct direction predictions (both must have same sign)
         correct_direction = (y_diff * pred_diff) > 0
-        directional_accuracy = np.mean(correct_direction) * 100
+        # Handle case where all differences are zero (constant values)
+        if len(correct_direction) == 0:
+            directional_accuracy = 0.0
+        else:
+            directional_accuracy = np.mean(correct_direction) * 100
         
         # Directional RMSE (only for correct direction predictions)
         if np.any(correct_direction):
@@ -355,35 +373,194 @@ class EvaluationMetrics:
         results_df = pd.DataFrame(self.results).T
         results_df.to_csv(filepath)
         logger.info(f"Results exported to {filepath}")
+    
+    def calculate_trading_metrics(self, y_true: pd.Series, y_pred: np.ndarray, 
+                                 trading_strategy: str = 'simple') -> Dict[str, float]:
+        """
+        Calculate trading-specific metrics for electricity price forecasting.
+        
+        Args:
+            y_true: True values
+            y_pred: Predicted values
+            trading_strategy: Trading strategy ('simple', 'arbitrage', 'peak_shaving')
+            
+        Returns:
+            Dictionary with trading metrics
+        """
+        # Ensure same length
+        min_len = min(len(y_true), len(y_pred))
+        y_true = y_true.iloc[:min_len]
+        y_pred = y_pred[:min_len]
+        
+        if trading_strategy == 'simple':
+            return self._calculate_simple_trading_metrics(y_true, y_pred)
+        elif trading_strategy == 'arbitrage':
+            return self._calculate_arbitrage_metrics(y_true, y_pred)
+        elif trading_strategy == 'peak_shaving':
+            return self._calculate_peak_shaving_metrics(y_true, y_pred)
+        else:
+            raise ValueError(f"Unknown trading strategy: {trading_strategy}")
+    
+    def _calculate_simple_trading_metrics(self, y_true: pd.Series, y_pred: np.ndarray) -> Dict[str, float]:
+        """Calculate simple trading metrics."""
+        # Price level accuracy for trading decisions
+        price_errors = np.abs(y_true - y_pred)
+        
+        # Trading accuracy (within 5% for profitable trading)
+        trading_accuracy_5pct = np.mean(price_errors / y_true <= 0.05) * 100
+        
+        # Peak price prediction accuracy (critical for trading)
+        price_75th = np.percentile(y_true, 75)
+        peak_mask = y_true >= price_75th
+        peak_accuracy = np.mean(price_errors[peak_mask] / y_true[peak_mask] <= 0.10) * 100 if np.any(peak_mask) else 0
+        
+        # Volatility prediction accuracy
+        y_true_vol = y_true.rolling(window=24).std()
+        y_pred_vol = pd.Series(y_pred).rolling(window=24).std()
+        vol_correlation = y_true_vol.corr(y_pred_vol) if len(y_true_vol.dropna()) > 0 else 0
+        
+        return {
+            'trading_accuracy_5pct': trading_accuracy_5pct,
+            'peak_prediction_accuracy': peak_accuracy,
+            'volatility_correlation': vol_correlation
+        }
+    
+    def _calculate_arbitrage_metrics(self, y_true: pd.Series, y_pred: np.ndarray) -> Dict[str, float]:
+        """Calculate arbitrage trading metrics."""
+        # Price spread prediction
+        price_spread_true = y_true.max() - y_true.min()
+        price_spread_pred = np.max(y_pred) - np.min(y_pred)
+        spread_accuracy = 1 - abs(price_spread_true - price_spread_pred) / price_spread_true if price_spread_true > 0 else 0
+        
+        # Peak and valley prediction accuracy
+        y_true_peaks = y_true.rolling(window=3, center=True).max() == y_true
+        y_pred_peaks = pd.Series(y_pred).rolling(window=3, center=True).max() == pd.Series(y_pred)
+        peak_detection_accuracy = np.mean(y_true_peaks == y_pred_peaks) * 100
+        
+        return {
+            'spread_accuracy': spread_accuracy,
+            'peak_detection_accuracy': peak_detection_accuracy
+        }
+    
+    def _calculate_peak_shaving_metrics(self, y_true: pd.Series, y_pred: np.ndarray) -> Dict[str, float]:
+        """Calculate peak shaving metrics."""
+        # Peak hours identification
+        price_75th = np.percentile(y_true, 75)
+        peak_hours_true = y_true >= price_75th
+        peak_hours_pred = y_pred >= price_75th
+        
+        peak_identification_accuracy = np.mean(peak_hours_true == peak_hours_pred) * 100
+        
+        # Peak magnitude prediction
+        peak_prices_true = y_true[peak_hours_true]
+        peak_prices_pred = y_pred[peak_hours_true]
+        peak_magnitude_mape = np.mean(np.abs((peak_prices_true - peak_prices_pred) / peak_prices_true)) * 100 if len(peak_prices_true) > 0 else 0
+        
+        return {
+            'peak_identification_accuracy': peak_identification_accuracy,
+            'peak_magnitude_mape': peak_magnitude_mape
+        }
+    
+    def calculate_risk_metrics(self, y_true: pd.Series, y_pred: np.ndarray) -> Dict[str, float]:
+        """
+        Calculate risk management metrics.
+        
+        Args:
+            y_true: True values
+            y_pred: Predicted values
+            
+        Returns:
+            Dictionary with risk metrics
+        """
+        # Ensure same length
+        min_len = min(len(y_true), len(y_pred))
+        y_true = y_true.iloc[:min_len]
+        y_pred = y_pred[:min_len]
+        
+        # Value at Risk (VaR) - 95% confidence
+        errors = y_true - y_pred
+        var_95 = np.percentile(errors, 5)  # 5th percentile of errors
+        
+        # Expected Shortfall (Conditional VaR)
+        es_95 = np.mean(errors[errors <= var_95])
+        
+        # Maximum drawdown in predictions
+        cumulative_errors = np.cumsum(errors)
+        running_max = np.maximum.accumulate(cumulative_errors)
+        drawdown = cumulative_errors - running_max
+        max_drawdown = np.min(drawdown)
+        
+        # Prediction stability (low variance in errors)
+        error_stability = 1 / (np.var(errors) + 1e-8)
+        
+        return {
+            'var_95': var_95,
+            'expected_shortfall_95': es_95,
+            'max_drawdown': max_drawdown,
+            'error_stability': error_stability
+        }
+    
+    def calculate_operational_metrics(self, y_true: pd.Series, y_pred: np.ndarray,
+                                    operational_thresholds: Dict[str, float] = None) -> Dict[str, float]:
+        """
+        Calculate operational metrics for energy management.
+        
+        Args:
+            y_true: True values
+            y_pred: Predicted values
+            operational_thresholds: Thresholds for operational decisions
+            
+        Returns:
+            Dictionary with operational metrics
+        """
+        if operational_thresholds is None:
+            operational_thresholds = {
+                'high_price_threshold': 80.0,  # €/MWh
+                'low_price_threshold': 20.0,  # €/MWh
+                'critical_threshold': 100.0   # €/MWh
+            }
+        
+        # Ensure same length
+        min_len = min(len(y_true), len(y_pred))
+        y_true = y_true.iloc[:min_len]
+        y_pred = y_pred[:min_len]
+        
+        # High price event prediction
+        high_price_true = y_true >= operational_thresholds['high_price_threshold']
+        high_price_pred = y_pred >= operational_thresholds['high_price_threshold']
+        high_price_accuracy = np.mean(high_price_true == high_price_pred) * 100
+        
+        # Critical price event prediction
+        critical_price_true = y_true >= operational_thresholds['critical_threshold']
+        critical_price_pred = y_pred >= operational_thresholds['critical_threshold']
+        critical_price_accuracy = np.mean(critical_price_true == critical_price_pred) * 100
+        
+        # Low price event prediction
+        low_price_true = y_true <= operational_thresholds['low_price_threshold']
+        low_price_pred = y_pred <= operational_thresholds['low_price_threshold']
+        low_price_accuracy = np.mean(low_price_true == low_price_pred) * 100
+        
+        # Operational cost impact
+        cost_impact = np.sum(np.abs(y_true - y_pred))  # Total cost error
+        
+        return {
+            'high_price_accuracy': high_price_accuracy,
+            'critical_price_accuracy': critical_price_accuracy,
+            'low_price_accuracy': low_price_accuracy,
+            'total_cost_impact': cost_impact
+        }
 
 
 def main():
-    """Example usage of evaluation metrics."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create synthetic electricity price data
-    t = np.arange(n_samples)
-    price = 50 + 10 * np.sin(2 * np.pi * t / 24) + np.random.normal(0, 2, n_samples)
-    
-    # Create true and predicted values
-    y_true = pd.Series(price, name='price')
-    y_pred = price + np.random.normal(0, 1, n_samples)  # Add some noise to predictions
-    
-    # Calculate metrics
-    evaluator = EvaluationMetrics()
-    metrics = evaluator.calculate_all_metrics(y_true, y_pred, 'test_model')
-    
-    print("Evaluation Metrics:")
-    for metric, value in metrics.items():
-        print(f"{metric}: {value:.4f}")
-    
-    # Calculate confidence intervals
-    ci_metrics = evaluator.calculate_confidence_intervals(y_true, y_pred)
-    print(f"\nConfidence Intervals (95%):")
-    print(f"Coverage: {ci_metrics['coverage']:.2f}%")
-    print(f"CI Width: {ci_metrics['ci_width']:.2f}")
+    """Example usage of evaluation metrics with real data."""
+    print("Evaluation Metrics example requires real electricity price data.")
+    print("Please use real data from ENTSO-E API or other sources.")
+    print("Example usage:")
+    print("1. Get real price data (y_true) and model predictions (y_pred)")
+    print("2. Create EvaluationMetrics instance")
+    print("3. Calculate metrics using calculate_all_metrics(y_true, y_pred)")
+    print("4. Access individual metrics from the results dictionary")
+    print("5. Use compare_models() to compare multiple models")
 
 
 if __name__ == "__main__":

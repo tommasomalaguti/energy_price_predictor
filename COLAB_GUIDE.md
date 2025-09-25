@@ -6,7 +6,7 @@ We have successfully tested the ENTSO-E API locally and confirmed it works! The 
 - Get real electricity price data from France, Netherlands, Spain, or Germany
 - Handle API authentication correctly
 - Parse XML responses properly
-- Fall back to synthetic data if needed
+- Use only real data from ENTSO-E API
 - Work reliably in Google Colab
 
 ## Quick Start
@@ -276,8 +276,8 @@ def get_real_data():
             print(f" Real data from {country_name} ready!")
             return combined_data
     
-    print("\n No real data found. Using synthetic data...")
-    return generate_synthetic_data()
+    print("\n No real data found. Please check your API token and try again.")
+    return None
 
 def get_real_data_single_day():
     """Get real electricity price data from ENTSO-E API (single day approach)."""
@@ -361,8 +361,8 @@ def get_real_data_single_day():
                 print(f"     Error: {e}")
                 continue
     
-    print("\n No real data found. Using synthetic data...")
-    return generate_synthetic_data()
+    print("\n No real data found. Please check your API token and try again.")
+    return None
 
 def parse_price_data(soup):
     """Parse price data from XML response."""
@@ -400,40 +400,9 @@ def parse_price_data(soup):
         print(f"Error parsing price data: {e}")
         return None
 
-def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
-    """Generate synthetic electricity price data."""
-    print(" Generating synthetic electricity price data...")
-    
-    dates = pd.date_range(start=start_date, periods=n_samples, freq='h')
-    
-    # Base price with seasonal patterns
-    base_price = 50 + 20 * np.sin(2 * np.pi * np.arange(n_samples) / (24 * 365))  # Annual seasonality
-    base_price += 10 * np.sin(2 * np.pi * np.arange(n_samples) / 24)  # Daily seasonality
-    
-    # Add some realistic volatility
-    noise = np.random.normal(0, 15, n_samples)
-    prices = base_price + noise
-    
-    # Add some extreme spikes (realistic for electricity markets)
-    spike_indices = np.random.choice(n_samples, size=int(0.01 * n_samples), replace=False)
-    prices[spike_indices] *= np.random.uniform(2, 5, len(spike_indices))
-    
-    # Ensure prices are positive
-    prices = np.maximum(prices, 5)
-    
-    data = pd.DataFrame({
-        'datetime': dates,
-        'price': prices,
-        'hour': dates.hour,
-        'day_of_week': dates.dayofweek,
-        'month': dates.month,
-        'year': dates.year
-    })
-    
-    print(f" Generated {len(data)} synthetic price records")
-    return data
+# Synthetic data generation removed - only real data is used
 
-# Get the data (real or synthetic) - try multi-day approach first
+# Get real data from ENTSO-E API
 print(" Trying to get data over multiple days for more records...")
 data = get_real_data()
 
@@ -541,48 +510,8 @@ if response.status_code != 200:
         print("Response preview:", response.text[:200])
     else:
         print(f"Germany response: {response.text[:300]}")
-        print("\n API seems to have issues. Let's proceed with synthetic data for the demo.")
-        
-        # Generate synthetic data as fallback
-        print("\n Generating synthetic electricity price data...")
-        import pandas as pd
-        import numpy as np
-        
-        def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
-            """Generate synthetic electricity price data for demonstration."""
-            dates = pd.date_range(start=start_date, periods=n_samples, freq='H')
-            
-            # Base price with seasonal patterns
-            base_price = 50 + 20 * np.sin(2 * np.pi * np.arange(n_samples) / (24 * 365))  # Annual seasonality
-            base_price += 10 * np.sin(2 * np.pi * np.arange(n_samples) / 24)  # Daily seasonality
-            
-            # Add some realistic volatility
-            noise = np.random.normal(0, 15, n_samples)
-            prices = base_price + noise
-            
-            # Add some extreme spikes (realistic for electricity markets)
-            spike_indices = np.random.choice(n_samples, size=int(0.01 * n_samples), replace=False)
-            prices[spike_indices] *= np.random.uniform(2, 5, len(spike_indices))
-            
-            # Ensure prices are positive
-            prices = np.maximum(prices, 5)
-            
-            data = pd.DataFrame({
-                'datetime': dates,
-                'price': prices,
-                'hour': dates.hour,
-                'day_of_week': dates.dayofweek,
-                'month': dates.month,
-                'year': dates.year
-            })
-            
-            return data
-        
-        synthetic_data = generate_synthetic_data()
-        print(f" Generated {len(synthetic_data)} synthetic price records")
-        print("Sample data:")
-        print(synthetic_data.head())
-        print(f"Price range: €{synthetic_data['price'].min():.2f} - €{synthetic_data['price'].max():.2f}/MWh")
+        print("\n API seems to have issues. Please check your API token and try again.")
+        print("This guide requires real data from ENTSO-E API.")
 ```
 
 ### 3.2.1 Quick Fix for Date Format Issue
@@ -648,8 +577,8 @@ elif response.status_code == 400:
             print("Response preview:", response3.text[:200])
         else:
             print("Still having issues. Full response:", response3.text[:500])
-            print("\n Let's use synthetic data for now and continue with the demo...")
-            print("The API token is working, but there might be data availability issues.")
+            print("\n Please check your API token and try again.")
+            print("This guide requires real data from ENTSO-E API.")
 else:
     print(f"Response: {response.status_code}")
     print("Response text:", response.text[:200])
@@ -745,36 +674,8 @@ print(data.head())
 # Just go back to Block 3.2 and run that cell first!
 ```
 
-#### Option B: Synthetic Data (No API Required)
-```python
-# Generate synthetic data
-def generate_synthetic_data(n_samples=8760, start_date='2023-01-01'):
-    np.random.seed(42)
-    dates = pd.date_range(start_date, periods=n_samples, freq='H')
-    
-    base_price = 50
-    daily_pattern = 15 * np.sin(2 * np.pi * np.arange(n_samples) / 24 - np.pi/2)
-    weekly_pattern = 5 * (dates.dayofweek < 5).astype(int)
-    monthly_pattern = 10 * np.sin(2 * np.pi * dates.month / 12)
-    trend = 0.001 * np.arange(n_samples)
-    noise = np.random.normal(0, 3, n_samples)
-    spikes = np.random.binomial(1, 0.02, n_samples) * np.random.exponential(20, n_samples)
-    
-    price = base_price + daily_pattern + weekly_pattern + monthly_pattern + trend + noise + spikes
-    price = np.maximum(price, 0)
-    
-    return pd.DataFrame({
-        'datetime': dates,
-        'price': price,
-        'hour': dates.hour,
-        'day_of_week': dates.dayofweek,
-        'month': dates.month,
-        'is_weekend': (dates.dayofweek >= 5).astype(int)
-    })
-
-data = generate_synthetic_data()
-print(f"Generated {len(data)} synthetic price records")
-```
+#### Note: Only Real Data is Used
+This guide only uses real electricity price data from the ENTSO-E API. No synthetic data fallback is available.
 
 ### 5. Data Preprocessing
 ```python

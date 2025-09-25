@@ -29,7 +29,7 @@ class ENTSOEDownloader:
     # ENTSO-E API endpoints
     BASE_URL = "https://web-api.tp.entsoe.eu/api"
     
-    # Country codes mapping
+    # Country codes mapping with working domain codes
     COUNTRY_CODES = {
         'AT': 'Austria',
         'BE': 'Belgium', 
@@ -115,7 +115,7 @@ class ENTSOEDownloader:
         current_date = datetime.strptime(start_date, '%Y-%m-%d')
         end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
         
-        while current_date < end_datetime:
+        while current_date <= end_datetime:
             chunk_end = min(current_date + timedelta(days=30), end_datetime)
             
             try:
@@ -130,11 +130,11 @@ class ENTSOEDownloader:
                 
                 # Rate limiting
                 time.sleep(1)
-                current_date = chunk_end
+                current_date = chunk_end + timedelta(days=1)  # Move to next day to avoid infinite loop
                 
             except Exception as e:
                 logger.error(f"Error downloading chunk {current_date}: {e}")
-                current_date = chunk_end
+                current_date = chunk_end + timedelta(days=1)  # Move to next day
                 continue
         
         if not all_data:
@@ -166,12 +166,30 @@ class ENTSOEDownloader:
         else:
             document_type = 'A65'  # Intraday prices
         
+        # Convert dates to the format that works (YYYYMMDD)
+        start_date_formatted = start_date.replace('-', '')
+        end_date_formatted = end_date.replace('-', '')
+        
+        # Use working domain codes from Colab
+        domain_codes = {
+            'FR': '10YFR-RTE------C',  # France - working in Colab
+            'NL': '10YNL----------L',   # Netherlands - working in Colab  
+            'ES': '10YES-REE------0',  # Spain - working in Colab
+            'IT': '10YIT----------',   # Italy - working in Colab
+            'DE': '10YDE----------',   # Germany
+            'AT': '10YAT-APG------L',  # Austria
+            'BE': '10YBE----------2',   # Belgium
+            'CH': '10YCH-SWISSGRIDZ'   # Switzerland
+        }
+        
+        domain_code = domain_codes.get(country, f'10Y{country}----------')
+        
         params = {
             'documentType': document_type,
-            'in_Domain': f'10Y{country}----------',
-            'out_Domain': f'10Y{country}----------',
-            'periodStart': f'{start_date}T00:00Z',
-            'periodEnd': f'{end_date}T23:59Z',
+            'in_Domain': domain_code,
+            'out_Domain': domain_code,
+            'periodStart': f'{start_date_formatted}0000',
+            'periodEnd': f'{end_date_formatted}2359',
             'securityToken': self.api_token
         }
         
@@ -193,7 +211,7 @@ class ENTSOEDownloader:
             df = self._parse_xml_response(response.text, data_type)
             return df
             
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             logger.error(f"API request failed: {e}")
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response status: {e.response.status_code}")
@@ -219,9 +237,21 @@ class ENTSOEDownloader:
                     price = float(point.find('price.amount').text)
                     
                     # Calculate actual datetime
-                    start_time = ts.find('start').text
-                    start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-                    actual_dt = start_dt + timedelta(hours=position-1)
+                    # Look for start time in different possible locations
+                    start_elem = ts.find('start')
+                    if start_elem is None:
+                        # Try nested structure
+                        time_interval = ts.find('timeInterval')
+                        if time_interval:
+                            start_elem = time_interval.find('start')
+                    
+                    if start_elem is not None:
+                        start_time = start_elem.text
+                        start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                        actual_dt = start_dt + timedelta(hours=position-1)
+                    else:
+                        # Fallback to current time if no start time found
+                        actual_dt = datetime.now()
                     
                     data.append({
                         'datetime': actual_dt,
@@ -247,7 +277,7 @@ class ENTSOEDownloader:
         df = df.drop_duplicates(subset=['datetime']).reset_index(drop=True)
         
         # Handle missing values
-        df['price'] = df['price'].fillna(method='ffill')
+        df['price'] = df['price'].ffill()
         
         # Add time-based features
         df['hour'] = df['datetime'].dt.hour

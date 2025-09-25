@@ -18,7 +18,7 @@ from sklearn.svm import SVR
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator, RegressorMixin
 try:
     import xgboost as xgb
@@ -33,6 +33,22 @@ try:
 except ImportError:
     LIGHTGBM_AVAILABLE = False
     print("Warning: LightGBM not available. LightGBM models will be disabled.")
+
+try:
+    import catboost as cb
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CATBOOST_AVAILABLE = False
+    print("Warning: CatBoost not available. CatBoost models will be disabled.")
+
+try:
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import DataLoader, TensorDataset
+    PYTORCH_AVAILABLE = True
+except ImportError:
+    PYTORCH_AVAILABLE = False
+    print("Warning: PyTorch not available. Neural network models will be disabled.")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -115,6 +131,16 @@ class MLModels:
                 verbose=-1
             )
         
+        # Add CatBoost if available
+        if CATBOOST_AVAILABLE:
+            models['catboost'] = cb.CatBoostRegressor(
+                iterations=100,
+                learning_rate=0.1,
+                depth=6,
+                random_seed=self.random_state,
+                verbose=False
+            )
+        
         return models
     
     def _get_hyperparameter_grids(self) -> Dict[str, Dict[str, List]]:
@@ -168,6 +194,15 @@ class MLModels:
                 'learning_rate': [0.01, 0.1, 0.2],
                 'max_depth': [3, 6, 10],
                 'subsample': [0.8, 0.9, 1.0]
+            }
+        
+        # Add CatBoost grid if available
+        if CATBOOST_AVAILABLE:
+            grids['catboost'] = {
+                'iterations': [50, 100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'depth': [3, 6, 10],
+                'l2_leaf_reg': [1, 3, 5, 7, 9]
             }
         
         return grids
@@ -322,6 +357,7 @@ class MLModels:
             rmse = np.sqrt(mse)
             mae = mean_absolute_error(y_test, pred)
             mape = np.mean(np.abs((y_test - pred) / y_test)) * 100
+            r2 = r2_score(y_test, pred)
             
             # Directional accuracy
             if len(pred) > 1:
@@ -337,42 +373,54 @@ class MLModels:
                 'rmse': rmse,
                 'mae': mae,
                 'mape': mape,
+                'r2': r2,
                 'directional_accuracy': directional_accuracy
             })
         
         self.results = pd.DataFrame(results)
         return self.results
     
-    def get_feature_importance(self, feature_names: List[str]) -> Dict[str, pd.DataFrame]:
+    def get_feature_importance(self, model_name: str) -> Optional[pd.DataFrame]:
         """
-        Get feature importance for tree-based models.
+        Get feature importance for a specific tree-based model.
         
         Args:
-            feature_names: List of feature names
+            model_name: Name of the model
             
         Returns:
-            Dictionary of feature importance DataFrames
+            DataFrame with feature importance or None if not available
         """
-        importance_models = ['random_forest', 'gradient_boosting', 'xgboost', 'lightgbm']
+        if model_name not in self.trained_models:
+            logger.warning(f"Model '{model_name}' not found in trained models")
+            return None
         
-        for name in importance_models:
-            if name in self.trained_models:
-                try:
-                    model = self.trained_models[name]
-                    
-                    if hasattr(model, 'feature_importances_'):
-                        importance_df = pd.DataFrame({
-                            'feature': feature_names,
-                            'importance': model.feature_importances_
-                        }).sort_values('importance', ascending=False)
-                        
-                        self.feature_importance[name] = importance_df
-                        logger.info(f"Feature importance calculated for {name}")
-                
-                except Exception as e:
-                    logger.error(f"Error calculating feature importance for {name}: {e}")
+        model = self.trained_models[model_name]
         
-        return self.feature_importance
+        if not hasattr(model, 'feature_importances_'):
+            logger.warning(f"Model '{model_name}' does not support feature importance")
+            return None
+        
+        try:
+            # Get feature names from the model or use generic names
+            if hasattr(model, 'feature_names_in_'):
+                feature_names = model.feature_names_in_
+            else:
+                # Fallback to generic feature names
+                n_features = len(model.feature_importances_)
+                feature_names = [f'feature_{i}' for i in range(n_features)]
+            
+            importance_df = pd.DataFrame({
+                'feature': feature_names,
+                'importance': model.feature_importances_
+            }).sort_values('importance', ascending=False)
+            
+            self.feature_importance[model_name] = importance_df
+            logger.info(f"Feature importance calculated for {model_name}")
+            return importance_df
+            
+        except Exception as e:
+            logger.error(f"Error calculating feature importance for {model_name}: {e}")
+            return None
     
     def get_best_model(self, metric: str = 'rmse') -> Tuple[str, BaseEstimator]:
         """
@@ -572,54 +620,15 @@ class MLModels:
 
 
 def main():
-    """Example usage of ML models."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create synthetic electricity price data with trend and seasonality
-    t = np.arange(n_samples)
-    trend = 0.01 * t
-    seasonal = 10 * np.sin(2 * np.pi * t / 24)  # Daily seasonality
-    noise = np.random.normal(0, 2, n_samples)
-    price = 50 + trend + seasonal + noise
-    
-    # Create features
-    features = pd.DataFrame({
-        'hour': t % 24,
-        'day_of_week': (t // 24) % 7,
-        'temperature': 20 + 10 * np.sin(2 * np.pi * t / 24) + np.random.normal(0, 2, n_samples),
-        'demand': 100 + 20 * np.sin(2 * np.pi * t / 24) + np.random.normal(0, 5, n_samples),
-        'lag_1': np.roll(price, 1),
-        'lag_24': np.roll(price, 24)
-    })
-    
-    y = pd.Series(price, name='price')
-    
-    # Split data
-    split_idx = int(0.8 * n_samples)
-    X_train, X_test = features.iloc[:split_idx], features.iloc[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-    
-    # Train and evaluate ML models
-    ml_models = MLModels()
-    ml_models.train_all(X_train, y_train, tune_hyperparameters=False)
-    predictions = ml_models.predict_all(X_test)
-    results = ml_models.evaluate_all(y_test, predictions)
-    
-    print("ML Model Results:")
-    print(results)
-    
-    # Get feature importance
-    feature_importance = ml_models.get_feature_importance(features.columns.tolist())
-    print(f"\nFeature importance calculated for {len(feature_importance)} models")
-    
-    # Get best model
-    best_name, best_model = ml_models.get_best_model('rmse')
-    print(f"\nBest model: {best_name}")
-    
-    # Plot results
-    ml_models.plot_predictions(y_test, predictions)
+    """Example usage of ML models with real data."""
+    print("ML Models example requires real electricity price data.")
+    print("Please use the ENTSO-E downloader to get real data first.")
+    print("Example usage:")
+    print("1. Download real data using ENTSOEDownloader")
+    print("2. Preprocess data using DataPreprocessor") 
+    print("3. Train models using MLModels.train_all()")
+    print("4. Make predictions using MLModels.predict_all()")
+    print("5. Evaluate results using MLModels.evaluate_all()")
 
 
 if __name__ == "__main__":

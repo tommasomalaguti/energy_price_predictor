@@ -520,48 +520,15 @@ class TimeSeriesModels:
 
 
 def main():
-    """Example usage of time series models."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create synthetic electricity price data with trend and seasonality
-    t = np.arange(n_samples)
-    trend = 0.01 * t
-    seasonal = 10 * np.sin(2 * np.pi * t / 24)  # Daily seasonality
-    noise = np.random.normal(0, 2, n_samples)
-    price = 50 + trend + seasonal + noise
-    
-    # Create time series
-    dates = pd.date_range('2023-01-01', periods=n_samples, freq='H')
-    series = pd.Series(price, index=dates, name='price')
-    
-    # Split data
-    split_idx = int(0.8 * n_samples)
-    train_series = series.iloc[:split_idx]
-    test_series = series.iloc[split_idx:]
-    
-    # Train and evaluate time series models
-    ts_models = TimeSeriesModels()
-    
-    # Check stationarity
-    ts_models.check_stationarity(train_series)
-    
-    # Train ARIMA
-    arima_model = ts_models.train_arima(train_series)
-    
-    # Make predictions
-    arima_pred = ts_models.predict_arima(len(test_series))
-    
-    # Evaluate
-    predictions = {'arima': arima_pred}
-    results = ts_models.evaluate_all(test_series, predictions)
-    
-    print("Time Series Model Results:")
-    print(results)
-    
-    # Plot diagnostics
-    ts_models.plot_diagnostics('arima')
+    """Example usage of time series models with real data."""
+    print("Time Series Models example requires real electricity price data.")
+    print("Please use the ENTSO-E downloader to get real data first.")
+    print("Example usage:")
+    print("1. Download real data using ENTSOEDownloader")
+    print("2. Preprocess data using DataPreprocessor") 
+    print("3. Train models using TimeSeriesModels.train_arima()")
+    print("4. Make predictions using TimeSeriesModels.predict_arima()")
+    print("5. Evaluate results using TimeSeriesModels.evaluate_all()")
 
 
 if __name__ == "__main__":

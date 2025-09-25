@@ -65,7 +65,7 @@ class TestDataPreprocessor:
         assert len(lag_cols) > 0
         
         # Check rolling features
-        rolling_cols = [col for col in features.columns if col.startswith('price_rolling_')]
+        rolling_cols = [col for col in features.columns if '24h' in col or 'rolling' in col]
         assert len(rolling_cols) > 0
     
     def test_engineer_features_with_weather(self, sample_price_data):

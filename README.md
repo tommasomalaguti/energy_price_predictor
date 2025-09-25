@@ -56,16 +56,25 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-1. **Download Data**: Run the data collection script for your target country
+### Option 1: Interactive Dashboard (Recommended)
+```bash
+# Install dependencies
+python install_dependencies.py
+
+# Run the dashboard
+streamlit run dashboard.py
+```
+Then open http://localhost:8501 in your browser.
+
+### Option 2: Programmatic Usage
 ```python
 from src.data.entsoe_downloader import ENTSOEDownloader
 downloader = ENTSOEDownloader()
 downloader.download_price_data(country='IT', start_date='2022-01-01')
 ```
 
-2. **Run Analysis**: Use the provided Jupyter notebooks for exploratory analysis and modeling
-
-3. **Generate Forecasts**: Use the modeling pipeline to train and evaluate different models
+### Option 3: Jupyter Notebooks
+Use the provided Jupyter notebooks for exploratory analysis and modeling
 
 ## Data Sources
 

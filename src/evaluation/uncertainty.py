@@ -235,6 +235,101 @@ class UncertaintyQuantifier:
         
         return predictions, lower_bounds, upper_bounds
     
+    def jackknife_prediction_intervals(
+        self, 
+        model, 
+        X_train: pd.DataFrame, 
+        y_train: pd.Series, 
+        X_test: pd.DataFrame,
+        n_subsamples: int = 10
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Calculate prediction intervals using jackknife resampling.
+        
+        Args:
+            model: Trained model
+            X_train: Training features
+            y_train: Training targets
+            X_test: Test features
+            n_subsamples: Number of jackknife subsamples
+            
+        Returns:
+            Tuple of (predictions, lower_bounds, upper_bounds)
+        """
+        n_samples = len(X_test)
+        predictions = np.zeros((n_subsamples, n_samples))
+        
+        # Create jackknife subsamples
+        subsample_size = len(X_train) // n_subsamples
+        
+        for i in range(n_subsamples):
+            # Create subsample by removing a portion of data
+            start_idx = i * subsample_size
+            end_idx = (i + 1) * subsample_size
+            
+            # Remove subsample
+            X_jack = X_train.drop(X_train.index[start_idx:end_idx])
+            y_jack = y_train.drop(y_train.index[start_idx:end_idx])
+            
+            # Train model on jackknife sample
+            model_copy = type(model)(**model.get_params())
+            model_copy.fit(X_jack, y_jack)
+            
+            # Make predictions
+            predictions[i] = model_copy.predict(X_test)
+        
+        # Calculate statistics
+        mean_predictions = np.mean(predictions, axis=0)
+        std_predictions = np.std(predictions, axis=0)
+        
+        # Calculate confidence intervals
+        z_score = 1.96  # 95% confidence
+        lower_bounds = mean_predictions - z_score * std_predictions
+        upper_bounds = mean_predictions + z_score * std_predictions
+        
+        return mean_predictions, lower_bounds, upper_bounds
+    
+    def bayesian_prediction_intervals(
+        self, 
+        model, 
+        X_test: pd.DataFrame,
+        n_samples: int = 1000
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Calculate prediction intervals using Bayesian approach.
+        
+        Args:
+            model: Trained model
+            X_test: Test features
+            n_samples: Number of Bayesian samples
+            
+        Returns:
+            Tuple of (predictions, lower_bounds, upper_bounds)
+        """
+        # This is a simplified Bayesian approach
+        # In practice, you would use proper Bayesian methods
+        
+        # Get base predictions
+        base_predictions = model.predict(X_test)
+        
+        # Estimate prediction variance (simplified)
+        # In practice, this would come from the model's uncertainty
+        prediction_variance = np.var(base_predictions) * 0.1
+        
+        # Sample from posterior distribution
+        posterior_samples = np.random.normal(
+            base_predictions, 
+            np.sqrt(prediction_variance), 
+            (n_samples, len(base_predictions))
+        )
+        
+        # Calculate statistics
+        mean_predictions = np.mean(posterior_samples, axis=0)
+        lower_bounds = np.percentile(posterior_samples, (self.alpha / 2) * 100, axis=0)
+        upper_bounds = np.percentile(posterior_samples, (1 - self.alpha / 2) * 100, axis=0)
+        
+        return mean_predictions, lower_bounds, upper_bounds
+    
     def calculate_prediction_uncertainty(
         self, 
         y_true: np.ndarray, 
@@ -328,53 +423,15 @@ class UncertaintyQuantifier:
 
 
 def main():
-    """Example usage of uncertainty quantification."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create features
-    X = pd.DataFrame({
-        'feature1': np.random.randn(n_samples),
-        'feature2': np.random.randn(n_samples),
-        'feature3': np.random.randn(n_samples)
-    })
-    
-    # Create target with some noise
-    y = 2 * X['feature1'] + 3 * X['feature2'] + np.random.randn(n_samples) * 0.5
-    
-    # Split data
-    split_idx = int(0.8 * n_samples)
-    X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-    
-    # Train a simple model
-    from sklearn.ensemble import RandomForestRegressor
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    
-    # Initialize uncertainty quantifier
-    uq = UncertaintyQuantifier(confidence_level=0.95)
-    
-    # Calculate bootstrap prediction intervals
-    pred_mean, pred_lower, pred_upper = uq.bootstrap_prediction_intervals(
-        model, X_train, y_train, X_test, n_bootstrap=50
-    )
-    
-    # Calculate uncertainty metrics
-    uncertainty_metrics = uq.calculate_prediction_uncertainty(
-        y_test.values, pred_mean, pred_lower, pred_upper
-    )
-    
-    print("Uncertainty Metrics:")
-    for metric, value in uncertainty_metrics.items():
-        print(f"{metric}: {value:.4f}")
-    
-    # Plot results
-    uq.plot_uncertainty_intervals(
-        y_test.values, pred_mean, pred_lower, pred_upper,
-        title="Bootstrap Prediction Intervals"
-    )
+    """Example usage of uncertainty quantification with real data."""
+    print("Uncertainty Quantification example requires real electricity price data.")
+    print("Please use the ENTSO-E downloader to get real data first.")
+    print("Example usage:")
+    print("1. Download real data using ENTSOEDownloader")
+    print("2. Preprocess data using DataPreprocessor") 
+    print("3. Train models using MLModels or TimeSeriesModels")
+    print("4. Use UncertaintyQuantifier to calculate prediction intervals")
+    print("5. Visualize uncertainty using plot_uncertainty_intervals()")
 
 
 if __name__ == "__main__":

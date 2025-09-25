@@ -413,42 +413,15 @@ class BaselineModels:
 
 
 def main():
-    """Example usage of baseline models."""
-    # Generate sample data
-    np.random.seed(42)
-    n_samples = 1000
-    
-    # Create synthetic electricity price data with trend and seasonality
-    t = np.arange(n_samples)
-    trend = 0.01 * t
-    seasonal = 10 * np.sin(2 * np.pi * t / 24)  # Daily seasonality
-    noise = np.random.normal(0, 2, n_samples)
-    price = 50 + trend + seasonal + noise
-    
-    # Create features and target
-    X = pd.DataFrame({'feature': np.random.randn(n_samples)})
-    y = pd.Series(price, name='price')
-    
-    # Split data
-    split_idx = int(0.8 * n_samples)
-    X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-    
-    # Train and evaluate baseline models
-    baseline = BaselineModels()
-    baseline.train_all(X_train, y_train)
-    predictions = baseline.predict_all(X_test)
-    results = baseline.evaluate_all(y_test, predictions)
-    
-    print("Baseline Model Results:")
-    print(results)
-    
-    # Get best model
-    best_name, best_model = baseline.get_best_model('rmse')
-    print(f"\nBest model: {best_name}")
-    
-    # Plot results
-    baseline.plot_predictions(y_test, predictions)
+    """Example usage of baseline models with real data."""
+    print("Baseline Models example requires real electricity price data.")
+    print("Please use the ENTSO-E downloader to get real data first.")
+    print("Example usage:")
+    print("1. Download real data using ENTSOEDownloader")
+    print("2. Preprocess data using DataPreprocessor") 
+    print("3. Train models using BaselineModels.train_all()")
+    print("4. Make predictions using BaselineModels.predict_all()")
+    print("5. Evaluate results using BaselineModels.evaluate_all()")
 
 
 if __name__ == "__main__":

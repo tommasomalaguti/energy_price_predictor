@@ -166,11 +166,13 @@ class TestMLModels:
         ml_models.train_all(X_train, y_train)
         
         # Get feature importance for random forest
-        importance = ml_models.get_feature_importance('random_forest')
+        importance_df = ml_models.get_feature_importance('random_forest')
         
-        if importance is not None:
-            assert len(importance) == X_train.shape[1]
-            assert all(imp >= 0 for imp in importance)
+        if importance_df is not None:
+            assert len(importance_df) == X_train.shape[1]
+            assert all(imp >= 0 for imp in importance_df['importance'])
+            assert 'feature' in importance_df.columns
+            assert 'importance' in importance_df.columns
     
     def test_model_persistence(self, sample_train_test_data, tmp_path):
         """Test model saving and loading."""
