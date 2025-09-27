@@ -298,6 +298,20 @@ class DataPreprocessor:
         logger.info(f"Feature engineering complete: {len(features_df.columns)} features")
         return features_df
     
+    def create_features(self, price_df: Optional[pd.DataFrame] = None, 
+                        weather_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+        """
+        Alias for engineer_features method for backward compatibility.
+        
+        Args:
+            price_df: Price DataFrame. If None, uses self.price_data
+            weather_df: Weather DataFrame. If None, uses self.weather_data
+            
+        Returns:
+            DataFrame with engineered features
+        """
+        return self.engineer_features(price_df, weather_df)
+    
     def _add_time_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add time-based features."""
         df['hour'] = df.index.hour
