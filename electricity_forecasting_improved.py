@@ -112,13 +112,13 @@ def safe_smape(y_true, y_pred):
     return np.minimum(smape, 200)  # Cap at 200% for sMAPE
 
 # Import our modules
-from data.entsoe_downloader import ENTSOEDownloader
-from data.preprocessor import DataPreprocessor
-from models.baseline_models import BaselineModels
-from models.ml_models import MLModels
-from models.time_series_models import TimeSeriesModels
-from evaluation.metrics import EvaluationMetrics
-from evaluation.visualization import ModelVisualization
+from src.data.entsoe_downloader import ENTSOEDownloader
+from src.data.preprocessor import DataPreprocessor
+from src.models.baseline_models import BaselineModels
+from src.models.ml_models import MLModels
+from src.models.time_series_models import TimeSeriesModels
+from src.evaluation.metrics import EvaluationMetrics
+from src.evaluation.visualization import ModelVisualization
 
 # Set up plotting
 plt.style.use('seaborn-v0_8')
@@ -174,8 +174,8 @@ def main():
         
         print(f" Downloaded {len(price_data)} data points")
         print(f" Date range: {price_data.index.min()} to {price_data.index.max()}")
-        print(f"💰 Price range: {price_data.min():.2f} to {price_data.max():.2f} €/MWh")
-        print(f" Mean price: {price_data.mean():.2f} €/MWh")
+        print(f"Price range: {price_data.min():.2f} to {price_data.max():.2f} EUR/MWh")
+        print(f" Mean price: {price_data.mean():.2f} EUR/MWh")
         
     except Exception as e:
         print(f" Error downloading real data: {e}")
@@ -269,13 +269,10 @@ def main():
         print("  No data cleaning needed - all values are within reasonable ranges")
     
     # ============================================================================
-    # 4. DATA PREPROCESSING AND FEATURE ENGINEERING
+    # 4. PROPER TEMPORAL TRAIN-TEST SPLIT (FIX DATA LEAKAGE!)
     # ============================================================================
-    print("\n 4. Data Preprocessing and Feature Engineering")
-    print("-" * 55)
-    
-    # Initialize preprocessor
-    preprocessor = DataPreprocessor()
+    print("\n 4. Proper Temporal Train-Test Split")
+    print("-" * 45)
     
     # Convert to DataFrame with proper datetime index
     if isinstance(price_data, pd.Series):
@@ -296,57 +293,162 @@ def main():
     print(f" Final index type: {type(df.index)}")
     print(f" Index sample: {df.index[:5]}")
     
-    # Create features
-    print("🔨 Creating features...")
-    features_df = preprocessor.engineer_features(df)
+    # CRITICAL: Split data BEFORE feature engineering to prevent data leakage
+    print("\n CRITICAL: Splitting data BEFORE feature engineering to prevent data leakage!")
     
-    print(f" Created {features_df.shape[1]} features")
-    print(f" Feature columns: {len(features_df.columns)}")
+    # Split by time (not by index) to prevent data leakage
+    test_size = 0.2
+    split_date = df.index[int(len(df) * (1 - test_size))]
+    
+    train_df = df[df.index < split_date].copy()
+    test_df = df[df.index >= split_date].copy()
+    
+    print(f" Training data: {len(train_df)} samples")
+    print(f" Test data: {len(test_df)} samples")
+    print(f" Train period: {train_df.index.min()} to {train_df.index.max()}")
+    print(f" Test period: {test_df.index.min()} to {test_df.index.max()}")
+    print(f" Split date: {split_date}")
     
     # ============================================================================
-    # 5. INTELLIGENT FEATURE SELECTION (NEW IMPROVEMENT!)
+    # 5. FEATURE ENGINEERING (SEPARATE FOR TRAIN/TEST)
     # ============================================================================
-    print("\n 5. Intelligent Feature Selection")
-    print("-" * 40)
+    print("\n 5. Feature Engineering (No Data Leakage)")
+    print("-" * 50)
     
-    print(f" Before feature selection: {features_df.shape[1]} features")
-    print(" Applying intelligent feature selection...")
+    # Initialize preprocessor
+    preprocessor = DataPreprocessor()
     
-    # Use the new feature selection method
-    selected_features_df = preprocessor.select_features(
-        features_df=features_df, 
-        target_column='price', 
-        max_features=25
-    )
+    # Engineer features ONLY on training data first
+    print("Creating features on training data...")
+    train_features_df = preprocessor.engineer_features(train_df)
     
-    print(f" After feature selection: {selected_features_df.shape[1]-1} features (excluding target)")
-    print(f" Data shape: {selected_features_df.shape}")
+    print(f" Training features created: {train_features_df.shape[1]} features")
     
-    # Update features_df to use selected features
-    features_df = selected_features_df.copy()
+    # For test data, we need to be careful about feature engineering
+    # We can only use information available up to each test point
+    print("Creating features on test data (with proper temporal constraints)...")
+    
+    # Create test features using only past information
+    test_features_df = test_df.copy()
+    
+    # Add basic time features (safe - no future data)
+    test_features_df['hour'] = test_features_df.index.hour
+    test_features_df['day_of_week'] = test_features_df.index.dayofweek
+    test_features_df['day_of_month'] = test_features_df.index.day
+    test_features_df['month'] = test_features_df.index.month
+    test_features_df['quarter'] = test_features_df.index.quarter
+    test_features_df['year'] = test_features_df.index.year
+    
+    # Add cyclical time features (safe)
+    test_features_df['hour_sin'] = np.sin(2 * np.pi * test_features_df['hour'] / 24)
+    test_features_df['hour_cos'] = np.cos(2 * np.pi * test_features_df['hour'] / 24)
+    test_features_df['day_sin'] = np.sin(2 * np.pi * test_features_df['day_of_week'] / 7)
+    test_features_df['day_cos'] = np.cos(2 * np.pi * test_features_df['day_of_week'] / 7)
+    test_features_df['month_sin'] = np.sin(2 * np.pi * test_features_df['month'] / 12)
+    test_features_df['month_cos'] = np.cos(2 * np.pi * test_features_df['month'] / 12)
+    
+    # Add weekend and business hours (safe)
+    test_features_df['is_weekend'] = (test_features_df['day_of_week'] >= 5).astype(int)
+    test_features_df['is_business_hours'] = ((test_features_df['hour'] >= 8) & (test_features_df['hour'] <= 18)).astype(int)
+    
+    # Add holiday features (safe)
+    test_features_df['is_holiday'] = 0
+    test_features_df.loc[(test_features_df.index.month == 1) & (test_features_df.index.day == 1), 'is_holiday'] = 1
+    test_features_df.loc[(test_features_df.index.month == 12) & (test_features_df.index.day == 25), 'is_holiday'] = 1
+    
+    # CRITICAL: For lag features, we can only use the last known price from training data
+    # This prevents data leakage
+    last_train_price = train_df['price'].iloc[-1]
+    last_24h_price = train_df['price'].iloc[-24] if len(train_df) >= 24 else last_train_price
+    last_168h_price = train_df['price'].iloc[-168] if len(train_df) >= 168 else last_train_price
+    
+    # Add lag features using only past information
+    test_features_df['price_lag_1'] = last_train_price
+    test_features_df['price_lag_24'] = last_24h_price
+    test_features_df['price_lag_168'] = last_168h_price
+    
+    # Add rolling statistics using only training data
+    train_24h_mean = train_df['price'].tail(24).mean()
+    train_24h_std = train_df['price'].tail(24).std()
+    train_168h_mean = train_df['price'].tail(168).mean() if len(train_df) >= 168 else train_24h_mean
+    
+    test_features_df['price_mean_24h'] = train_24h_mean
+    test_features_df['price_std_24h'] = train_24h_std
+    test_features_df['price_mean_168h'] = train_168h_mean
+    
+    # Add price volatility and momentum using only training data
+    test_features_df['price_volatility'] = train_24h_std / train_24h_mean if train_24h_mean != 0 else 0
+    test_features_df['price_momentum_24h'] = last_train_price - last_24h_price
+    
+    # Fill any missing features with training data statistics
+    for col in train_features_df.columns:
+        if col not in test_features_df.columns and col != 'price':
+            if col in train_features_df.columns:
+                test_features_df[col] = train_features_df[col].mean()
+            else:
+                test_features_df[col] = 0
+    
+    print(f" Test features created: {test_features_df.shape[1]} features")
+    
+    # ============================================================================
+    # 6. INTELLIGENT FEATURE SELECTION (ON TRAINING DATA ONLY)
+    # ============================================================================
+    print("\n 6. Intelligent Feature Selection (Training Data Only)")
+    print("-" * 60)
+    
+    print(f" Before feature selection: {train_features_df.shape[1]} features")
+    print(" Applying intelligent feature selection on training data...")
+    
+    # Debug: Check if select_features method exists
+    print(f" Preprocessor type: {type(preprocessor)}")
+    print(f" Available methods: {[method for method in dir(preprocessor) if not method.startswith('_')]}")
+    
+    if hasattr(preprocessor, 'select_features'):
+        print(" select_features method found!")
+        # Use the new feature selection method on training data only
+        selected_train_features_df = preprocessor.select_features(
+            features_df=train_features_df, 
+            target_column='price', 
+            max_features=25
+        )
+    else:
+        print(" select_features method NOT found!")
+        print(" Available methods:", [method for method in dir(preprocessor) if not method.startswith('_')])
+        # Fallback: use manual feature selection on training data only
+        print(" Using fallback feature selection on training data...")
+        feature_cols = [col for col in train_features_df.columns if col != 'price']
+        # Select top 25 features based on correlation with target
+        correlations = train_features_df[feature_cols].corrwith(train_features_df['price']).abs().sort_values(ascending=False)
+        selected_cols = correlations.head(25).index.tolist()
+        selected_train_features_df = train_features_df[selected_cols + ['price']]
+        print(f" Fallback selection: {len(selected_cols)} features selected")
+    
+    print(f" After feature selection: {selected_train_features_df.shape[1]-1} features (excluding target)")
+    print(f" Training data shape: {selected_train_features_df.shape}")
+    
+    # Get the selected feature columns (excluding target)
+    selected_feature_cols = [col for col in selected_train_features_df.columns if col != 'price']
     
     print("\n Selected Features:")
-    feature_cols = [col for col in features_df.columns if col != 'price']
-    for i, feature in enumerate(feature_cols, 1):
+    for i, feature in enumerate(selected_feature_cols, 1):
         print(f"   {i:2d}. {feature}")
     
-    print(f"\n Feature selection complete! Reduced from 95+ to {len(feature_cols)} features.")
+    print(f"\n Feature selection complete! Reduced to {len(selected_feature_cols)} features.")
     print("This should improve model performance and reduce overfitting.")
     
-    # ============================================================================
-    # 6. TRAIN-TEST SPLIT
-    # ============================================================================
-    print("\n 6. Train-Test Split")
-    print("-" * 25)
+    # Apply the same feature selection to test data
+    print("\n Applying same feature selection to test data...")
+    test_selected_features_df = test_features_df[selected_feature_cols + ['price']].copy()
     
-    test_size = 0.2
-    split_idx = int(len(features_df) * (1 - test_size))
+    print(f" Test data shape after feature selection: {test_selected_features_df.shape}")
     
-    train_data = features_df.iloc[:split_idx]
-    test_data = features_df.iloc[split_idx:]
+    # Final train and test data
+    train_data = selected_train_features_df.copy()
+    test_data = test_selected_features_df.copy()
     
-    print(f" Training data: {len(train_data)} samples")
-    print(f" Test data: {len(test_data)} samples")
+    print(f"\n Final data shapes:")
+    print(f" Training data: {train_data.shape}")
+    print(f" Test data: {test_data.shape}")
     print(f" Train period: {train_data.index.min()} to {train_data.index.max()}")
     print(f" Test period: {test_data.index.min()} to {test_data.index.max()}")
     
@@ -368,7 +470,7 @@ def main():
     trained_baseline_models = baseline_models.train_all(X_train_baseline, train_data['price'])
     
     # Make predictions
-    print("🔮 Making baseline predictions...")
+    print("Making baseline predictions...")
     baseline_predictions = baseline_models.predict_all(X_test_baseline)
     
     # Evaluate models
@@ -398,7 +500,7 @@ def main():
     # ============================================================================
     # 8. MACHINE LEARNING MODELS
     # ============================================================================
-    print("\n🤖 8. Training Machine Learning Models")
+    print("\n 8. Training Machine Learning Models")
     print("-" * 45)
     
     # Initialize ML models
@@ -415,7 +517,7 @@ def main():
     print(f" Test features: {X_test.shape}")
     
     # Clean data - handle infinite values and outliers
-    print("🧹 Cleaning data...")
+    print("Cleaning data...")
     print(f"   Before cleaning - X_train has {np.isinf(X_train).sum().sum()} infinite values")
     print(f"   Before cleaning - X_train has {np.isnan(X_train).sum().sum()} NaN values")
     
@@ -456,7 +558,7 @@ def main():
     trained_models = ml_models.train_all(X_train, y_train)
     
     # Make predictions
-    print("🔮 Making predictions...")
+    print("Making predictions...")
     predictions = ml_models.predict_all(X_test)
     
     # Evaluate models
@@ -608,13 +710,13 @@ def main():
     best_model = comparison_df.iloc[0]['Model']
     best_predictions = all_results[best_model]['predictions']
     
-    print(f"\n🥇 Best performing model: {best_model}")
+    print(f"\n Best performing model: {best_model}")
     print(f" Best RMSE: {comparison_df.iloc[0]['RMSE']:.2f}")
     
     # ============================================================================
     # 11. BUSINESS IMPACT ANALYSIS
     # ============================================================================
-    print("\n💰 11. Business Impact Analysis")
+    print("\n 11. Business Impact Analysis")
     print("-" * 35)
     
     # Calculate business impact
@@ -624,12 +726,12 @@ def main():
     
     print(f" Analysis period: {test_hours} hours")
     print(f" Total consumption: {total_consumption} MWh")
-    print(f"💰 Average price: {test_data['price'].mean():.2f} EUR/MWh")
-    print(f"💰 Total cost at average price: {total_consumption * test_data['price'].mean():.2f} EUR")
+    print(f" Average price: {test_data['price'].mean():.2f} EUR/MWh")
+    print(f" Total cost at average price: {total_consumption * test_data['price'].mean():.2f} EUR")
     
     # Calculate cost savings with perfect predictions
     actual_costs = (test_data['price'] * consumption_mwh).sum()
-    print(f"\n💰 Actual total cost: {actual_costs:.2f} EUR")
+    print(f"\n Actual total cost: {actual_costs:.2f} EUR")
     
     # Calculate cost with best model predictions
     if best_predictions is not None:
@@ -637,7 +739,7 @@ def main():
         cost_difference = abs(actual_costs - predicted_costs)
         cost_accuracy = (1 - cost_difference / actual_costs) * 100
         
-        print(f"💰 Predicted total cost: {predicted_costs:.2f} EUR")
+        print(f" Predicted total cost: {predicted_costs:.2f} EUR")
         print(f" Cost prediction error: {cost_difference:.2f} EUR")
         print(f" Cost prediction accuracy: {cost_accuracy:.1f}%")
     else:
@@ -649,14 +751,14 @@ def main():
         cost_difference = abs(actual_costs - predicted_costs)
         cost_accuracy = (1 - cost_difference / actual_costs) * 100
         
-        print(f"💰 Baseline predicted cost: {predicted_costs:.2f} EUR")
+        print(f" Baseline predicted cost: {predicted_costs:.2f} EUR")
         print(f" Cost prediction error: {cost_difference:.2f} EUR")
         print(f" Cost prediction accuracy: {cost_accuracy:.1f}%")
     
     # Calculate potential savings from better forecasting
     price_volatility = test_data['price'].std()
     print(f"\n Price volatility (std): {price_volatility:.2f} EUR/MWh")
-    print(f"💰 Potential savings from perfect forecasting: {price_volatility * total_consumption * 0.1:.2f} EUR (10% of volatility)")
+    print(f" Potential savings from perfect forecasting: {price_volatility * total_consumption * 0.1:.2f} EUR (10% of volatility)")
     
     # Additional business insights
     print(f"\n Additional Business Insights:")
@@ -668,7 +770,7 @@ def main():
     # Calculate potential savings scenarios
     perfect_forecast_savings = price_volatility * total_consumption * 0.1
     good_forecast_savings = price_volatility * total_consumption * 0.05
-    print(f"\n💰 Potential savings scenarios:")
+    print(f"\n Potential savings scenarios:")
     print(f"   Perfect forecasting: {perfect_forecast_savings:.2f} EUR")
     print(f"   Good forecasting (50% of perfect): {good_forecast_savings:.2f} EUR")
     print(f"   ROI potential: {(perfect_forecast_savings / actual_costs * 100):.1f}% of total costs")
@@ -676,10 +778,10 @@ def main():
     # ============================================================================
     # 12. IMPROVED FUTURE PREDICTIONS (NEW IMPROVEMENT!)
     # ============================================================================
-    print("\n🔮 12. Improved Future Predictions")
+    print("\n 12. Improved Future Predictions")
     print("-" * 40)
     
-    print(f"🔮 Making future predictions with {best_model}...")
+    print(f" Making future predictions with {best_model}...")
     
     # Create future features with comprehensive feature engineering
     future_hours = 24  # Predict next 24 hours
@@ -766,7 +868,7 @@ def main():
     # Make predictions using the best model
     try:
         if best_model in predictions.keys():  # It's an ML model
-            print(f"🤖 Using trained {best_model} model for predictions...")
+            print(f"Using trained {best_model} model for predictions...")
             
             # Get the trained model from ml_models
             trained_model = trained_models[best_model]
@@ -844,7 +946,7 @@ def main():
         'predicted_price': future_predictions
     })
     
-    print(f"\n🔮 Future Predictions for Next {future_hours} Hours:")
+    print(f"\n Future Predictions for Next {future_hours} Hours:")
     print(future_df.head(10))
     
     # Analysis of predictions
@@ -881,7 +983,7 @@ def main():
     print(f"   Best MAE: {comparison_df.iloc[0]['MAE']:.2f}")
     print(f"   Best MAPE: {comparison_df.iloc[0]['MAPE']:.2f}%")
     
-    print(f"\n💰 Business Impact:")
+    print(f"\n Business Impact:")
     print(f"   Cost prediction accuracy: {cost_accuracy:.1f}%")
     print(f"   Potential savings: {price_volatility * total_consumption * 0.1:.2f} EUR")
     
