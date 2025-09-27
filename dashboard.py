@@ -127,7 +127,7 @@ def main():
     # Show startup time
     startup_time = time.time() - startup_start
     if startup_time > 2:  # Only show if startup took more than 2 seconds
-        st.info(f"⏱️ Dashboard loaded in {startup_time:.1f} seconds")
+        st.info(f"Dashboard loaded in Dashboard loaded in {startup_time:.1f} seconds")
     
     # Header
     st.markdown('<h1 class="main-header">Electricity Price Forecasting Dashboard</h1>', 
@@ -146,13 +146,13 @@ def main():
         if check_ml_models_availability():
             st.success("✓ ML Models")
         else:
-            st.warning("⚠ ML Models (XGBoost issue)")
+            st.warning("WARNING ML Models (XGBoost issue)")
     
     with col4:
         if check_ensemble_models_availability():
             st.success("✓ Ensemble Models")
         else:
-            st.warning("⚠ Ensemble Models")
+            st.warning("WARNING Ensemble Models")
     
     # Show XGBoost fix instructions if needed
     if not check_ml_models_availability():
@@ -272,7 +272,7 @@ def show_entsoe_data_explorer():
         country = st.selectbox("Country", ["IT", "FR", "DE", "ES", "NL", "BE", "AT", "CH"])
     
     # Date range
-    st.info("📅 **Date Range**: Use historical data (past dates) for best results. ENTSO-E typically provides data up to yesterday.")
+    st.info("Date Range **Date Range**: Use historical data (past dates) for best results. ENTSO-E typically provides data up to yesterday.")
     
     col1, col2 = st.columns(2)
     
@@ -296,11 +296,11 @@ def show_entsoe_data_explorer():
                     try:
                         downloader = ENTSOEDownloader(api_token=api_token)
                         if downloader.test_api_connection():
-                            st.success("✅ API token is valid!")
+                            st.success("SUCCESS API token is valid!")
                         else:
-                            st.error("❌ API token is invalid or expired")
+                            st.error("ERROR API token is invalid or expired")
                     except Exception as e:
-                        st.error(f"❌ API test failed: {e}")
+                        st.error(f"ERROR API test failed: {e}")
     
     with col2:
         if st.button("Download Data", type="primary"):
@@ -477,8 +477,8 @@ def show_model_training():
                 
                 # Check if we have enough data for training
                 if len(clean_data) < 10:
-                    st.warning(f"⚠️ Only {len(clean_data)} records after cleaning. This may not be enough for training.")
-                    st.info("💡 Consider using sample data or a longer date range for better results.")
+                    st.warning(f"WARNING️ Only {len(clean_data)} records after cleaning. This may not be enough for training.")
+                    st.info("TIP Consider using sample data or a longer date range for better results.")
                     
                     # Offer to use sample data as fallback
                     if st.button("Use Sample Data Instead", type="secondary"):
@@ -500,7 +500,7 @@ def show_model_training():
                             'price': prices
                         })
                         clean_data.set_index('datetime', inplace=True)
-                        st.success(f"✅ Generated {len(clean_data)} sample records")
+                        st.success(f"SUCCESS Generated {len(clean_data)} sample records")
                 
                 features_df = preprocessor.engineer_features(clean_data)
                 
@@ -737,14 +737,14 @@ def show_business_analysis():
                 st.markdown("### Recommendations")
                 
                 if risk_level == "Low":
-                    st.success("✅ Model accuracy is excellent for operational planning")
-                    st.info("💡 Consider implementing automated trading strategies")
+                    st.success("SUCCESS Model accuracy is excellent for operational planning")
+                    st.info("TIP Consider implementing automated trading strategies")
                 elif risk_level == "Medium":
-                    st.warning("⚠️ Model accuracy is good but could be improved")
-                    st.info("💡 Consider ensemble methods or additional features")
+                    st.warning("WARNING️ Model accuracy is good but could be improved")
+                    st.info("TIP Consider ensemble methods or additional features")
                 else:
-                    st.error("❌ Model accuracy needs improvement for operational use")
-                    st.info("💡 Consider more sophisticated models or additional data sources")
+                    st.error("ERROR Model accuracy needs improvement for operational use")
+                    st.info("TIP Consider more sophisticated models or additional data sources")
                 
             except Exception as e:
                 st.error(f"Error calculating business impact: {e}")

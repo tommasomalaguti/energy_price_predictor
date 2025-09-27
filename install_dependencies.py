@@ -144,7 +144,7 @@ def test_imports():
             __import__(module)
             print(f"✓ {name} - Available")
         except ImportError:
-            print(f"⚠ {name} - Not available (optional)")
+            print(f"WARNING {name} - Not available (optional)")
 
 def main():
     """Main installation script."""

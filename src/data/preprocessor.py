@@ -547,6 +547,173 @@ class DataPreprocessor:
         
         return X_train, X_test, y_train, y_test
     
+    def select_features(self, features_df: Optional[pd.DataFrame] = None, 
+                       target_column: str = 'price', max_features: int = 25) -> pd.DataFrame:
+        """
+        Intelligent feature selection to reduce dimensionality and improve model performance.
+        
+        Uses multiple techniques:
+        1. Remove low-variance features
+        2. Remove highly correlated features  
+        3. Select most important features based on mutual information
+        4. Prioritize domain-specific important features
+        
+        Args:
+            features_df: Features DataFrame. If None, uses self.processed_data
+            target_column: Name of the target column
+            max_features: Maximum number of features to select
+            
+        Returns:
+            DataFrame with selected features
+        """
+        if features_df is None:
+            features_df = self.processed_data.copy()
+        
+        if features_df is None:
+            raise ValueError("No processed data available for feature selection")
+        
+        logger.info(f"Starting feature selection from {len(features_df.columns)} features...")
+        
+        # Separate features and target
+        feature_columns = [col for col in features_df.columns if col != target_column]
+        X = features_df[feature_columns].copy()
+        y = features_df[target_column].copy()
+        
+        # Remove rows with missing target values
+        valid_idx = ~y.isna()
+        X = X[valid_idx]
+        y = y[valid_idx]
+        
+        # Step 1: Remove low-variance features
+        logger.info("Step 1: Removing low-variance features...")
+        from sklearn.feature_selection import VarianceThreshold
+        
+        # Handle infinite and NaN values
+        X_clean = X.replace([np.inf, -np.inf], np.nan)
+        X_clean = X_clean.fillna(X_clean.median())
+        
+        # Remove features with very low variance
+        variance_selector = VarianceThreshold(threshold=0.01)
+        X_variance = variance_selector.fit_transform(X_clean)
+        selected_features = X_clean.columns[variance_selector.get_support()].tolist()
+        
+        logger.info(f"After variance filtering: {len(selected_features)} features")
+        X_clean = X_clean[selected_features]
+        
+        # Step 2: Remove highly correlated features
+        logger.info("Step 2: Removing highly correlated features...")
+        correlation_matrix = X_clean.corr().abs()
+        upper_triangle = correlation_matrix.where(
+            np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)
+        )
+        
+        # Find features with correlation > 0.95
+        high_corr_features = [column for column in upper_triangle.columns 
+                             if any(upper_triangle[column] > 0.95)]
+        
+        # Keep the feature with higher correlation to target
+        features_to_remove = []
+        for feature in high_corr_features:
+            correlated_features = upper_triangle.columns[upper_triangle[feature] > 0.95].tolist()
+            if correlated_features:
+                # Calculate correlation with target for each correlated feature
+                target_correlations = {}
+                for corr_feature in correlated_features + [feature]:
+                    if corr_feature in X_clean.columns:
+                        target_correlations[corr_feature] = abs(X_clean[corr_feature].corr(y))
+                
+                # Remove all except the one with highest target correlation
+                best_feature = max(target_correlations.keys(), key=lambda k: target_correlations[k])
+                for corr_feature in correlated_features:
+                    if corr_feature != best_feature and corr_feature not in features_to_remove:
+                        features_to_remove.append(corr_feature)
+        
+        X_clean = X_clean.drop(columns=features_to_remove)
+        logger.info(f"After correlation filtering: {len(X_clean.columns)} features")
+        
+        # Step 3: Prioritize domain-important features
+        logger.info("Step 3: Prioritizing domain-important features...")
+        
+        # Define feature importance categories
+        high_priority_patterns = [
+            'price_lag_1', 'price_lag_24', 'price_lag_168',  # Recent price lags
+            'hour', 'day_of_week', 'is_weekend',  # Time features
+            'hour_sin', 'hour_cos', 'day_sin', 'day_cos',  # Cyclical time
+            'price_mean_24h', 'price_std_24h',  # Rolling statistics
+            'fourier_daily_sin_1', 'fourier_daily_cos_1',  # Seasonality
+            'fourier_weekly_sin_1', 'fourier_weekly_cos_1',
+        ]
+        
+        medium_priority_patterns = [
+            'price_lag_', 'price_mean_', 'price_std_', 'price_median_',
+            'fourier_', 'month_sin', 'month_cos', 'is_business_hours',
+            'price_volatility', 'price_change', 'price_momentum'
+        ]
+        
+        # Categorize features
+        high_priority_features = []
+        medium_priority_features = []
+        low_priority_features = []
+        
+        for feature in X_clean.columns:
+            if any(pattern in feature for pattern in high_priority_patterns):
+                high_priority_features.append(feature)
+            elif any(pattern in feature for pattern in medium_priority_patterns):
+                medium_priority_features.append(feature)
+            else:
+                low_priority_features.append(feature)
+        
+        logger.info(f"High priority: {len(high_priority_features)}, "
+                   f"Medium priority: {len(medium_priority_features)}, "
+                   f"Low priority: {len(low_priority_features)}")
+        
+        # Step 4: Use mutual information for final selection
+        logger.info("Step 4: Selecting features using mutual information...")
+        
+        if len(X_clean.columns) > max_features:
+            from sklearn.feature_selection import mutual_info_regression
+            
+            # Calculate mutual information scores
+            mi_scores = mutual_info_regression(X_clean, y, random_state=42)
+            mi_scores_df = pd.DataFrame({
+                'feature': X_clean.columns,
+                'mi_score': mi_scores
+            }).sort_values('mi_score', ascending=False)
+            
+            # Select features with priority weighting
+            selected_features = []
+            
+            # Always include available high priority features (up to 10)
+            available_high_priority = [f for f in high_priority_features if f in X_clean.columns]
+            selected_features.extend(available_high_priority[:10])
+            
+            # Fill remaining slots with highest MI scores
+            remaining_slots = max_features - len(selected_features)
+            if remaining_slots > 0:
+                # Get features not already selected, sorted by MI score
+                remaining_features = mi_scores_df[
+                    ~mi_scores_df['feature'].isin(selected_features)
+                ]['feature'].tolist()
+                
+                selected_features.extend(remaining_features[:remaining_slots])
+            
+            X_selected = X_clean[selected_features]
+        else:
+            X_selected = X_clean
+            selected_features = X_clean.columns.tolist()
+        
+        logger.info(f"Final feature selection: {len(selected_features)} features")
+        logger.info(f"Selected features: {selected_features}")
+        
+        # Create final DataFrame with target
+        result_df = X_selected.copy()
+        result_df[target_column] = y
+        
+        # Store the selected features list for future use
+        self.selected_features = selected_features
+        
+        return result_df
+    
     def save_processed_data(self, file_path: str) -> None:
         """Save processed data to CSV file."""
         if self.processed_data is None:
