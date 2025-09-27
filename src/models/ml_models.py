@@ -356,7 +356,11 @@ class MLModels:
             mse = mean_squared_error(y_test, pred)
             rmse = np.sqrt(mse)
             mae = mean_absolute_error(y_test, pred)
-            mape = np.mean(np.abs((y_test - pred) / y_test)) * 100
+            # Safe MAPE calculation to handle zero/very low values
+            epsilon = 1e-8
+            mape = np.mean(np.abs((y_test - pred) / (y_test + epsilon))) * 100
+            # Symmetric MAPE (more stable)
+            smape = np.mean(2 * np.abs(y_test - pred) / (np.abs(y_test) + np.abs(pred))) * 100
             r2 = r2_score(y_test, pred)
             
             # Directional accuracy
@@ -373,6 +377,7 @@ class MLModels:
                 'rmse': rmse,
                 'mae': mae,
                 'mape': mape,
+                'smape': smape,
                 'r2': r2,
                 'directional_accuracy': directional_accuracy
             })
